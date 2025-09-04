@@ -171,7 +171,7 @@ class HeartRateViewModel: ObservableObject {
     }
 
     // MARK: - Persistence
-    private func saveData() {
+    func saveData() {
         if let encoded = try? JSONEncoder().encode(log) {
             UserDefaults.standard.set(encoded, forKey: saveKey)
         }

@@ -10,9 +10,22 @@
 		3C1AB2B82E652C84007C169F /* Heart Rate Monitor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Heart Rate Monitor.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		3C6BCDAC2E67C397008FE461 /* Exceptions for "Heart Rate Monitor" folder in "Heart Rate Monitor" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"Heart-Rate-Monitor-Info.plist",
+			);
+			target = 3C1AB2B72E652C84007C169F /* Heart Rate Monitor */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		3C1AB2BA2E652C84007C169F /* Heart Rate Monitor */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				3C6BCDAC2E67C397008FE461 /* Exceptions for "Heart Rate Monitor" folder in "Heart Rate Monitor" target */,
+			);
 			path = "Heart Rate Monitor";
 			sourceTree = "<group>";
 		};
@@ -254,6 +267,8 @@
 				DEVELOPMENT_TEAM = XVUN5CYHJC;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Heart-Rate-Monitor-Info.plist";
+				INFOPLIST_KEY_NSCameraUsageDescription = "This app uses the camera and flash to estimate heart rate by measuring fingertip color changes.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -282,6 +297,8 @@
 				DEVELOPMENT_TEAM = XVUN5CYHJC;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Heart-Rate-Monitor-Info.plist";
+				INFOPLIST_KEY_NSCameraUsageDescription = "This app uses the camera and flash to estimate heart rate by measuring fingertip color changes.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
