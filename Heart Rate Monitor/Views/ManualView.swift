@@ -12,19 +12,25 @@ struct ManualView: View {
 
     var body: some View {
         VStack(spacing: 24) {
-            Text("Manual Heart Rate Monitor")
-                .font(.title)
-                .padding(.top)
-
             switch vm.phase {
             case .idle:
-                Text("Press Start to begin")
-                    .foregroundColor(.gray)
-
-                Button("Start Manual Session") {
-                    vm.startSession()
+                VStack(spacing: 16) {
+                    Text("Manual Measurement")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                    
+                    Text("Measure your heart rate by tapping the button in rhythm with your heartbeat. Place two fingers on your neck or wrist to find your pulse, then tap for 12 seconds to get an accurate reading.")
+                        .multilineTextAlignment(.center)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal)
+                    
+                    Button("Start Manual Session") {
+                        vm.startSession()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .padding(.top, 8)
                 }
-                .buttonStyle(.borderedProminent)
+                .frame(maxHeight: .infinity, alignment: .center)
 
             case .measuring:
                 VStack(spacing: 16) {
@@ -70,17 +76,22 @@ struct ManualView: View {
                 }
 
             case .finished:
-                if let bpm = vm.currentBPM {
-                    Text("Final Result: \(bpm) BPM")
-                        .font(.title2)
-                } else {
-                    Text("No data recorded")
-                }
+                VStack(spacing: 16) {
+                    if let bpm = vm.currentBPM {
+                        Text("Final Result: \(bpm) BPM")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                    } else {
+                        Text("No data recorded")
+                            .foregroundColor(.secondary)
+                    }
 
-                Button("Start New Session") {
-                    vm.startNewSession()
+                    Button("Done") {
+                        vm.startNewSession()
+                    }
+                    .buttonStyle(.borderedProminent)
                 }
-                .buttonStyle(.borderedProminent)
+                .frame(maxHeight: .infinity, alignment: .center)
             }
 
             Spacer()

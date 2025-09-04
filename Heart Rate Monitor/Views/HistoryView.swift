@@ -21,18 +21,32 @@ struct HistoryView: View {
     var body: some View {
         NavigationStack {
             List {
-                if let avg = averageBPM {
-                    Section {
-                        HStack {
-                            Text("Average of all sessions")
-                            Spacer()
-                            Text("\(avg) BPM")
-                                .fontWeight(.semibold)
+                if vm.log.isEmpty {
+                    VStack(spacing: 8) {
+                        Text("No Records")
+                            .font(.title2)
+                            .foregroundColor(.secondary)
+                        Text("Records will appear here after you complete a measurement")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .listRowBackground(Color.clear)
+                } else {
+                    if let avg = averageBPM {
+                        Section {
+                            HStack {
+                                Text("Average of all sessions")
+                                Spacer()
+                                Text("\(avg) BPM")
+                                    .fontWeight(.semibold)
+                            }
                         }
                     }
-                }
 
-                Section {
+                    Section {
                     ForEach(vm.log) { entry in
                         HStack {
                             if isSelectionMode {
@@ -65,10 +79,12 @@ struct HistoryView: View {
                         vm.log.remove(atOffsets: offsets)
                         vm.saveData()
                     }
+                    }
                 }
             }
             .navigationTitle("History")
             .toolbar {
+                if !vm.log.isEmpty {
                 ToolbarItem(placement: .topBarTrailing) {
                     if isSelectionMode {
                         Button(action: {
@@ -100,6 +116,7 @@ struct HistoryView: View {
                         }
                     }
                 }
+            }
             }
         }
     }
