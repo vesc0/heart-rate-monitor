@@ -81,6 +81,8 @@ struct AutoView: View {
                                     .foregroundColor(.secondary)
                             }
                         }
+                        
+                        Spacer()
                     }
                 } else if autoVM.phase == .finished {
                     VStack(spacing: 16) {

@@ -49,8 +49,13 @@ struct ManualView: View {
                             .foregroundColor(.gray)
                     }
                     Spacer()
-                    Button("Tap") { vm.recordTap() }
-                        .buttonStyle(.bordered)
+                    VStack(spacing: 16) {
+                        Button("Tap") { vm.recordTap() }
+                            .buttonStyle(.bordered)
+                        Button("Stop") { vm.stopSession() }
+                            .buttonStyle(.bordered)
+                            .foregroundColor(.red)
+                    }
                 }
 
             case .preview:
@@ -71,8 +76,13 @@ struct ManualView: View {
                     Text("\(vm.secondsLeft)s left")
                         .foregroundColor(.gray)
                     Spacer()
-                    Button("Tap") { vm.recordTap() }
-                        .buttonStyle(.bordered)
+                    VStack(spacing: 16) {
+                        Button("Tap") { vm.recordTap() }
+                            .buttonStyle(.bordered)
+                        Button("Stop") { vm.stopSession() }
+                            .buttonStyle(.bordered)
+                            .foregroundColor(.red)
+                    }
                 }
 
             case .finished:

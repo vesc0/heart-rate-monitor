@@ -95,7 +95,7 @@ struct HistoryView: View {
                             isSelectionMode = false
                             selectedEntries.removeAll()
                         }) {
-                            Text("Delete \(selectedEntries.count)")
+                            Text("Delete")
                                 .foregroundColor(.red)
                         }
                         .disabled(selectedEntries.isEmpty)

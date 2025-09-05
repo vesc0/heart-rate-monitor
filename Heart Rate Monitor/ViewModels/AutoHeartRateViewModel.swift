@@ -16,6 +16,9 @@ final class AutoHeartRateViewModel: NSObject, ObservableObject {
     @Published var secondsLeft: Int = 0
     @Published var heartScale: CGFloat = 1.0
     @Published var errorMessage: String?
+    
+    // State
+    private var stoppedEarly = false
 
     // Capture
     let session = AVCaptureSession()
@@ -47,6 +50,7 @@ final class AutoHeartRateViewModel: NSObject, ObservableObject {
     func startSession() {
         guard phase == .idle || phase == .finished else { return }
         reset()
+        stoppedEarly = false
         phase = .measuring
         
         // Use the dedicated capture queue for all camera operations
@@ -64,7 +68,10 @@ final class AutoHeartRateViewModel: NSObject, ObservableObject {
     }
 
     func stopSessionEarly() {
-        endSession()
+        stoppedEarly = true
+        phase = .idle
+        cleanupCamera()
+        invalidateTimers()
     }
 
     private func finishMeasuring() {
@@ -74,13 +81,18 @@ final class AutoHeartRateViewModel: NSObject, ObservableObject {
     }
 
     private func endSession() {
-        // Final BPM = average over ALL intervals detected so far
-        currentBPM = computeBPM(from: intervals)
+        if !stoppedEarly {
+            // Final BPM = average over ALL intervals detected so far
+            currentBPM = computeBPM(from: intervals)
+            phase = .finished
+        } else {
+            currentBPM = nil
+            phase = .idle
+        }
 
         // Clean up capture
         cleanupCamera()
         invalidateTimers()
-        phase = .finished
     }
     
     private func cleanupCamera() {

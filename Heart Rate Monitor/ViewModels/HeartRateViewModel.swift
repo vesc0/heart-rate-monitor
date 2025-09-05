@@ -83,7 +83,8 @@ class HeartRateViewModel: ObservableObject {
         let finalBPM = computeAverageBPM(from: validIntervals)
         currentBPM = finalBPM
 
-        if let bpm = finalBPM {
+        // Only save if we're in preview phase (means it wasn't stopped early)
+        if let bpm = finalBPM, phase == .preview {
             let entry = HeartRateEntry(bpm: bpm, date: Date())
             log.insert(entry, at: 0)
             saveData()
@@ -94,6 +95,12 @@ class HeartRateViewModel: ObservableObject {
     }
 
     func startNewSession() {
+        invalidateAllTimers()
+        resetInMemoryOnly()
+        phase = .idle
+    }
+    
+    func stopSession() {
         invalidateAllTimers()
         resetInMemoryOnly()
         phase = .idle
