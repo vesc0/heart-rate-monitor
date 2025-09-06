@@ -51,7 +51,7 @@ open "Heart Rate Monitor.xcodeproj"
 ##  Usage
 
 1. Select **Manual** tab — tap “Start Manual Session”, then tap in rhythm with your pulse.
-2. Select **Automatic** tab — tap “Start Automatic Session”, cover the rear main camera lens, and wait a few seconds.
+2. Select **Automatic** tab — tap “Start Automatic Session”, cover the rear main camera lens, and wait a few seconds. The app will prompt for camera permission the first time you start an automatic session, so make sure to allow it.
 3. View results in **History** tab — swipe to delete a single entry, or select and delete multiple entries. View your average heart rate.
 
 ##  Project Architecture
@@ -69,21 +69,18 @@ HeartRateMonitor/
 │   ├── AutoView.swift
 │   └── HistoryView.swift
 │   └── CameraPreview.swift
-└── Info.plist (with camera permission)
 ```
 
 ## Screenshots
 
 <p align="center">
-  <img src="screenshots/auto-mode.png" alt="auto-mode">
+  <img src="screenshots/auto-mode.PNG" alt="auto-mode" width="300">
 </p>
----
 
 <p align="center">
-  <img src="screenshots/manual-mode.png" alt="manual-mode">
+  <img src="screenshots/manual-mode.PNG" alt="manual-mode" width="300">
 </p>
----
 
 <p align="center">
-  <img src="screenshots/history.png" alt="history">
+  <img src="screenshots/history.PNG" alt="history" width="300">
 </p>
