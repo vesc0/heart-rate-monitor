@@ -35,7 +35,7 @@ This is not a medical app. It is intended for entertainment and educational purp
 
 **Prerequisites**:
 - Xcode 15+  
-- iOS 17+
+- iOS 17.6+
 
 **Setup**:
 ```bash
