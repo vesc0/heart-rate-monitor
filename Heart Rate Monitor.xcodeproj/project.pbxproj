@@ -255,6 +255,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Heart-Rate-Monitor-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Heart Rate Monitor";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				INFOPLIST_KEY_NSCameraUsageDescription = "This app uses the camera and flash to estimate heart rate by measuring fingertip color changes.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -287,6 +288,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Heart-Rate-Monitor-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Heart Rate Monitor";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				INFOPLIST_KEY_NSCameraUsageDescription = "This app uses the camera and flash to estimate heart rate by measuring fingertip color changes.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
