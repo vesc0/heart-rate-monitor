@@ -9,6 +9,15 @@ import SwiftUI
 
 struct ManualView: View {
     @ObservedObject var vm: HeartRateViewModel
+    
+    // Known durations from HeartRateViewModel
+    private var totalForCurrentPhase: Int {
+        switch vm.phase {
+        case .measuring: return 12
+        case .preview: return 10
+        default: return 0
+        }
+    }
 
     var body: some View {
         VStack(spacing: 24) {
@@ -34,21 +43,26 @@ struct ManualView: View {
 
             case .measuring:
                 VStack(spacing: 16) {
-                    Image(systemName: "heart.fill")
-                        .resizable()
-                        .frame(width: 96, height: 96)
-                        .foregroundColor(.red)
-                        .scaleEffect(vm.heartScale)
-
+                    Spacer()
+                    
+                    // Centered heart with circular countdown
+                    HeartTimerView(
+                        heartScale: vm.heartScale,
+                        secondsLeft: vm.secondsLeft,
+                        totalSeconds: totalForCurrentPhase,
+                        heartSize: 96,
+                        color: .red
+                    )
+                    
                     Text("Tap with your heartbeat")
+                    
                     if !vm.hasTapped {
                         Text("Waiting for first tap…")
                             .foregroundColor(.gray)
-                    } else {
-                        Text("\(vm.secondsLeft)s left")
-                            .foregroundColor(.gray)
                     }
+                    
                     Spacer()
+                    
                     VStack(spacing: 20) {
                         Button("Tap") { vm.recordTap() }
                             .buttonStyle(.bordered)
@@ -62,12 +76,16 @@ struct ManualView: View {
 
             case .preview:
                 VStack(spacing: 16) {
-                    Image(systemName: "heart.fill")
-                        .resizable()
-                        .frame(width: 96, height: 96)
-                        .foregroundColor(.red)
-                        .scaleEffect(vm.heartScale)
-
+                    Spacer()
+                    
+                    HeartTimerView(
+                        heartScale: vm.heartScale,
+                        secondsLeft: vm.secondsLeft,
+                        totalSeconds: totalForCurrentPhase,
+                        heartSize: 96,
+                        color: .red
+                    )
+                    
                     if let bpm = vm.currentBPM {
                         Text("\(bpm) BPM")
                             .font(.system(size: 42, weight: .bold))
@@ -75,9 +93,9 @@ struct ManualView: View {
                         Text("Waiting for taps…")
                             .foregroundColor(.gray)
                     }
-                    Text("\(vm.secondsLeft)s left")
-                        .foregroundColor(.gray)
+                    
                     Spacer()
+                    
                     VStack(spacing: 20) {
                         Button("Tap") { vm.recordTap() }
                             .buttonStyle(.bordered)

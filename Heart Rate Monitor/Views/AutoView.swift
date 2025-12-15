@@ -13,6 +13,15 @@ struct AutoView: View {
     // Local view model for camera-based heart rate detection
     @StateObject private var autoVM = AutoHeartRateViewModel()
     
+    // Known durations from AutoHeartRateViewModel
+    private var totalForCurrentPhase: Int {
+        switch autoVM.phase {
+        case .measuring: return 12
+        case .preview: return 10
+        default: return 0
+        }
+    }
+    
     var body: some View {
         ZStack {
             // Camera preview only during measuring
@@ -53,31 +62,26 @@ struct AutoView: View {
                     .frame(maxHeight: .infinity, alignment: .center)
                 } else if autoVM.phase == .measuring || autoVM.phase == .preview {
                     VStack(spacing: 16) {
-                        Image(systemName: "heart.fill")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 96, height: 96)
-                            .foregroundColor(.red)
-                            .scaleEffect(autoVM.heartScale)
-                            .padding(.top, 32)
+                        Spacer()
+                        
+                        // Centered heart with circular countdown
+                        HeartTimerView(
+                            heartScale: autoVM.heartScale,
+                            secondsLeft: autoVM.secondsLeft,
+                            totalSeconds: totalForCurrentPhase,
+                            heartSize: 96,
+                            color: .red
+                        )
                         
                         if autoVM.phase == .measuring {
-                            VStack(spacing: 8) {
-                                Text("Measuring… keep fingertip on the camera")
-                                    .foregroundColor(.secondary)
-                                Text("\(autoVM.secondsLeft)s left")
-                                    .foregroundColor(.secondary)
-                            }
+                            Text("Keep fingertip on the camera")
+                                .foregroundColor(.secondary)
                         } else {
-                            VStack(spacing: 8) {
-                                if let bpm = autoVM.currentBPM {
-                                    Text("\(bpm) BPM")
-                                        .font(.system(size: 42, weight: .bold))
-                                } else {
-                                    Text("Calibrating…")
-                                        .foregroundColor(.secondary)
-                                }
-                                Text("\(autoVM.secondsLeft)s left")
+                            if let bpm = autoVM.currentBPM {
+                                Text("\(bpm) BPM")
+                                    .font(.system(size: 42, weight: .bold))
+                            } else {
+                                Text("Calibrating…")
                                     .foregroundColor(.secondary)
                             }
                         }
@@ -102,41 +106,38 @@ struct AutoView: View {
                         .buttonStyle(.borderedProminent)
                     }
                     .frame(maxHeight: .infinity, alignment: .center)
-                    }
-                    
-                    if let err = autoVM.errorMessage {
-                        Text(err)
-                            .foregroundColor(.red)
-                            .multilineTextAlignment(.center)
-                    }
-                    
-                    Spacer()
-                    
-                    // Bottom-fixed stop button during measurement
-                    Group {
-                        if autoVM.phase == .measuring || autoVM.phase == .preview {
-                            Button(role: .destructive) {
-                                autoVM.stopSessionEarly()
-                            } label: {
-                                Text("Stop")
-                            }
-                            .buttonStyle(.bordered)
+                }
+                
+                if let err = autoVM.errorMessage {
+                    Text(err)
+                        .foregroundColor(.red)
+                        .multilineTextAlignment(.center)
+                }
+                
+                Spacer()
+                
+                // Bottom-fixed stop button during measurement
+                Group {
+                    if autoVM.phase == .measuring || autoVM.phase == .preview {
+                        Button(role: .destructive) {
+                            autoVM.stopSessionEarly()
+                        } label: {
+                            Text("Stop")
                         }
+                        .buttonStyle(.bordered)
                     }
-                    .padding(.bottom, 20)
                 }
-
+                .padding(.bottom, 20)
             }
-            // When session ends, save to shared history
-            .onChange(of: autoVM.phase) { old, newPhase in
-                if newPhase == .finished, let bpm = autoVM.currentBPM {
-                    let entry = HeartRateEntry(bpm: bpm, date: Date())
-                    vm.log.insert(entry, at: 0)
-                    vm.saveData()
-                }
-            }
-            .navigationTitle("Automatic")
         }
-
+        // When session ends, save to shared history
+        .onChange(of: autoVM.phase) { _, newPhase in
+            if newPhase == .finished, let bpm = autoVM.currentBPM {
+                let entry = HeartRateEntry(bpm: bpm, date: Date())
+                vm.log.insert(entry, at: 0)
+                vm.saveData()
+            }
+        }
+        .navigationTitle("Automatic")
     }
-
+}

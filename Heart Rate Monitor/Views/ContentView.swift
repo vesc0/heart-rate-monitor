@@ -9,6 +9,7 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var vm = HeartRateViewModel()
+    @StateObject private var auth = AuthViewModel()
     @State private var selectedTab = 2
     
     var body: some View {
@@ -30,6 +31,13 @@ struct ContentView: View {
                     Label("History", systemImage: "list.bullet")
                 }
                 .tag(3)
+            
+            ProfileView()
+                .environmentObject(auth)
+                .tabItem {
+                    Label("Profile", systemImage: "person.crop.circle")
+                }
+                .tag(4)
         }
     }
 }
@@ -37,3 +45,4 @@ struct ContentView: View {
 #Preview {
     ContentView()
 }
+

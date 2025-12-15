@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct HeartRateEntry: Identifiable, Codable {
+struct HeartRateEntry: Identifiable, Codable, Equatable {
     let id: UUID
     let bpm: Int
     let date: Date
