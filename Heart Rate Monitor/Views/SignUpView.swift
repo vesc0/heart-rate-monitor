@@ -8,7 +8,8 @@ struct SignUpView: View {
     @State private var showPassword = false
     @State private var isLoading = false
     @State private var errorText: String?
-    
+    var inPopup: Bool = false
+
     private var passwordsMatch: Bool {
         !password.isEmpty && password == confirm
     }
@@ -22,11 +23,13 @@ struct SignUpView: View {
             Text("Create Account")
                 .font(.largeTitle)
                 .fontWeight(.bold)
+                .padding(.bottom, 2)
             
             Text("Sign up to sync and back up your measurements.")
                 .foregroundColor(.secondary)
+                .padding(.bottom, 14)
             
-            VStack(spacing: 12) {
+            VStack(spacing: 14) {
                 TextField("Email", text: $email)
                     .textInputAutocapitalization(.never)
                     .keyboardType(.emailAddress)
@@ -98,16 +101,19 @@ struct SignUpView: View {
                 .padding(.top, 8)
             }
         }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(Color(.secondarySystemGroupedBackground))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(Color.black.opacity(0.06), lineWidth: 1)
-        )
-        .shadow(color: .black.opacity(0.04), radius: 12, x: 0, y: 6)
+        .if(!inPopup) { view in
+            view
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .fill(Color(.secondarySystemGroupedBackground))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .stroke(Color.black.opacity(0.06), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.04), radius: 12, x: 0, y: 6)
+        }
     }
     
     private func submitHaptic(success: Bool) {
@@ -130,3 +136,13 @@ struct SignUpView: View {
     }
 }
 
+private extension View {
+    @ViewBuilder
+    func `if`<Content: View>(_ condition: Bool, @ViewBuilder then: (Self) -> Content) -> some View {
+        if condition {
+            then(self)
+        } else {
+            self
+        }
+    }
+}

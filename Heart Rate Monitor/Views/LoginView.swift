@@ -7,18 +7,20 @@ struct LoginView: View {
     @State private var showPassword = false
     @State private var isLoading = false
     @State private var errorText: String?
-    
+    var inPopup: Bool = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Welcome Back")
                 .font(.largeTitle)
                 .fontWeight(.bold)
+                .padding(.bottom, 2)
             
             Text("Log in to continue tracking your heart health.")
                 .foregroundColor(.secondary)
+                .padding(.bottom, 14)
             
-            VStack(spacing: 12) {
-                // Email
+            VStack(spacing: 14) {
                 TextField("Email", text: $email)
                     .textInputAutocapitalization(.never)
                     .keyboardType(.emailAddress)
@@ -26,7 +28,6 @@ struct LoginView: View {
                     .padding()
                     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 
-                // Password
                 HStack {
                     if showPassword {
                         TextField("Password", text: $password)
@@ -81,16 +82,19 @@ struct LoginView: View {
                 .padding(.top, 8)
             }
         }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(Color(.secondarySystemGroupedBackground))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(Color.black.opacity(0.06), lineWidth: 1)
-        )
-        .shadow(color: .black.opacity(0.04), radius: 12, x: 0, y: 6)
+        .if(!inPopup) { view in
+            view
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .fill(Color(.secondarySystemGroupedBackground))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .stroke(Color.black.opacity(0.06), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.04), radius: 12, x: 0, y: 6)
+        }
     }
     
     private func submitHaptic(success: Bool) {
@@ -113,3 +117,13 @@ struct LoginView: View {
     }
 }
 
+private extension View {
+    @ViewBuilder
+    func `if`<Content: View>(_ condition: Bool, @ViewBuilder then: (Self) -> Content) -> some View {
+        if condition {
+            then(self)
+        } else {
+            self
+        }
+    }
+}
