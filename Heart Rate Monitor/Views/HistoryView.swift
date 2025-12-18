@@ -77,9 +77,8 @@ struct HistoryView: View {
     
     // MARK: - Period computations
     private var currentWeekRange: (start: Date, end: Date) {
-        // Find Monday of the week for today, then apply offset in weeks
-        let weekday = calendar.component(.weekday, from: todayStart) // 1=Sun…7=Sat
-        let daysFromMonday = (weekday == 1) ? 6 : (weekday - 2) // Sun->6, Mon->0, Tue->1, ...
+        let weekday = calendar.component(.weekday, from: todayStart)
+        let daysFromMonday = (weekday == 1) ? 6 : (weekday - 2)
         let monday = calendar.date(byAdding: .day, value: -daysFromMonday, to: todayStart) ?? todayStart
         let start = calendar.date(byAdding: .day, value: weekOffset * 7, to: monday) ?? monday
         let end = calendar.date(byAdding: .day, value: 6, to: start) ?? start
@@ -124,7 +123,6 @@ struct HistoryView: View {
         return monthDays.compactMap { dict[$0] }
     }
     
-    // Paged measurements slice
     private var pagedLog: ArraySlice<HeartRateEntry> {
         let end = min(visibleCount, vm.log.count)
         return vm.log.prefix(end)
@@ -134,14 +132,12 @@ struct HistoryView: View {
         visibleCount < vm.log.count
     }
     
-    // Average across all sessions
     var averageBPM: Int? {
         guard !vm.log.isEmpty else { return nil }
         let sum = vm.log.reduce(0) { $0 + $1.bpm }
         return sum / vm.log.count
     }
     
-    // MARK: - Titles
     private var periodTitle: String {
         switch rangeMode {
         case .weekly:
@@ -155,14 +151,14 @@ struct HistoryView: View {
             return title
         case .monthly:
             let fmt = DateFormatter()
-            fmt.dateFormat = "LLLL yyyy" // e.g., September 2025
+            fmt.dateFormat = "LLLL yyyy"
             return fmt.string(from: currentMonthStart)
         }
     }
 
     var body: some View {
         NavigationStack {
-            List {
+            Group {
                 if vm.log.isEmpty {
                     VStack(spacing: 8) {
                         Text("No Records")
@@ -174,205 +170,198 @@ struct HistoryView: View {
                             .multilineTextAlignment(.center)
                             .padding(.horizontal)
                         
-                        // Seed button for demo
+                        // Keep borderedProminent, only color
                         Button("Load Demo Data") {
                             seedSampleDataIfNeeded()
                         }
                         .buttonStyle(.borderedProminent)
+                        .tint(.red)
                         .padding(.top, 8)
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .listRowBackground(Color.clear)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                    .padding()
                 } else {
-                    // Range selector + header with navigation
-                    Section {
-                        // Segmented control
-                        Picker("Range", selection: $rangeMode) {
-                            Text("Weekly").tag(RangeMode.weekly)
-                            Text("Monthly").tag(RangeMode.monthly)
-                        }
-                        .pickerStyle(.segmented)
-                        
-                        // Header with period title and navigation
-                        HStack {
-                            Button {
-                                withAnimation(.easeInOut) {
-                                    if rangeMode == .weekly { weekOffset -= 1 }
-                                    else { monthOffset -= 1 }
-                                }
-                            } label: {
-                                Image(systemName: "chevron.left")
-                            }
-                            .buttonStyle(.plain)
-                            
-                            Spacer()
-                            
-                            Text(periodTitle)
-                                .font(.headline)
-                            
-                            Spacer()
-                            
-                            Button {
-                                withAnimation(.easeInOut) {
-                                    if rangeMode == .weekly {
-                                        weekOffset = min(0, weekOffset + 1)
-                                    } else {
-                                        monthOffset = min(0, monthOffset + 1)
-                                    }
-                                }
-                            } label: {
-                                Image(systemName: "chevron.right")
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(rangeMode == .weekly ? weekOffset == 0 : monthOffset == 0)
-                            .opacity((rangeMode == .weekly ? weekOffset == 0 : monthOffset == 0) ? 0.4 : 1)
-                        }
-                        .padding(.top, 4)
-                        
-                        // Prepare data
-                        let baseData: [DailyBPMRange] = (rangeMode == .weekly) ? dailyRangesForCurrentWeek : dailyRangesForCurrentMonth
-                        let chartData: [DailyBPMRange] = baseData.filter { $0.min != 0 || $0.max != 0 }
-                        
-                        // Chart
-                        Chart(chartData) { day in
-                            RuleMark(
-                                x: .value("Day", day.day),
-                                yStart: .value("Min BPM", day.min),
-                                yEnd: .value("Max BPM", day.max)
-                            )
-                            .foregroundStyle(Color.red)
-                            // Thicker line for weekly view, default for monthly
-                            .lineStyle(StrokeStyle(lineWidth: rangeMode == .weekly ? 10 : 6, lineCap: .round))
-                        }
-                        // X Axis formatting
-                        .chartXAxis {
-                            if rangeMode == .weekly {
-                                AxisMarks(values: weekDays) { value in
-                                    AxisGridLine()
-                                    AxisTick()
-                                    if let dateValue = value.as(Date.self) {
-                                        AxisValueLabel(weekdayInitialMonFirst(for: dateValue))
-                                    }
-                                }
-                            } else {
-                                AxisMarks(values: monthDays) { value in
-                                    AxisGridLine()
-                                    AxisTick()
-                                    if let dateValue = value.as(Date.self) {
-                                        let day = calendar.component(.day, from: dateValue)
-                                        AxisValueLabel(String(format: "%02d", day))
-                                    }
-                                }
-                            }
-                        }
-                        // Y axis on the right without label text
-                        .chartYAxis {
-                            AxisMarks(position: .trailing)
-                        }
-                        .frame(height: 220)
-                        .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
-                    } header: {
-                        Text(rangeMode == .weekly ? "Daily Range (Weekly)" : "Daily Range (Monthly)")
-                    }
-                    
-                    if let avg = averageBPM {
+                    List {
                         Section {
+                            Picker("Range", selection: $rangeMode) {
+                                Text("Weekly").tag(RangeMode.weekly)
+                                Text("Monthly").tag(RangeMode.monthly)
+                            }
+                            .pickerStyle(.segmented)
+                            
                             HStack {
-                                Text("Average of all sessions")
-                                Spacer()
-                                Text("\(avg) BPM")
-                                    .fontWeight(.semibold)
-                            }
-                        }
-                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
-                    }
-                    
-                    // Measurements as a proper section with header style matching "Daily Range"
-                    Section {
-                        // Rows
-                        ForEach(pagedLog) { entry in
-                            HStack(spacing: 12) {
-                                if isSelectionMode {
-                                    Image(systemName: selectedEntries.contains(entry.id) ? "checkmark.circle.fill" : "circle")
-                                        .foregroundColor(selectedEntries.contains(entry.id) ? .accentColor : .gray)
+                                Button {
+                                    withAnimation(.easeInOut) {
+                                        if rangeMode == .weekly { weekOffset -= 1 }
+                                        else { monthOffset -= 1 }
+                                    }
+                                } label: {
+                                    Image(systemName: "chevron.left")
                                 }
+                                .buttonStyle(.plain)
                                 
-                                Text("\(entry.bpm) BPM")
-                                    .fontWeight(.semibold)
-                                Spacer(minLength: 8)
-                                VStack(alignment: .trailing, spacing: 2) {
-                                    Text(entry.date, style: .date)
-                                    Text(entry.date, style: .time)
-                                        .foregroundColor(.gray)
-                                        .font(.caption)
+                                Spacer()
+                                
+                                Text(periodTitle)
+                                    .font(.headline)
+                                
+                                Spacer()
+                                
+                                Button {
+                                    withAnimation(.easeInOut) {
+                                        if rangeMode == .weekly {
+                                            weekOffset = min(0, weekOffset + 1)
+                                        } else {
+                                            monthOffset = min(0, monthOffset + 1)
+                                        }
+                                    }
+                                } label: {
+                                    Image(systemName: "chevron.right")
                                 }
+                                .buttonStyle(.plain)
+                                .disabled(rangeMode == .weekly ? weekOffset == 0 : monthOffset == 0)
+                                .opacity((rangeMode == .weekly ? weekOffset == 0 : monthOffset == 0) ? 0.4 : 1)
                             }
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                if isSelectionMode {
-                                    if selectedEntries.contains(entry.id) {
-                                        selectedEntries.remove(entry.id)
-                                    } else {
-                                        selectedEntries.insert(entry.id)
+                            .padding(.top, 4)
+                            
+                            let baseData: [DailyBPMRange] = (rangeMode == .weekly) ? dailyRangesForCurrentWeek : dailyRangesForCurrentMonth
+                            let chartData: [DailyBPMRange] = baseData.filter { $0.min != 0 || $0.max != 0 }
+                            
+                            Chart(chartData) { day in
+                                RuleMark(
+                                    x: .value("Day", day.day),
+                                    yStart: .value("Min BPM", day.min),
+                                    yEnd: .value("Max BPM", day.max)
+                                )
+                                .foregroundStyle(Color.red)
+                                .lineStyle(StrokeStyle(lineWidth: rangeMode == .weekly ? 10 : 6, lineCap: .round))
+                            }
+                            .chartXAxis {
+                                if rangeMode == .weekly {
+                                    AxisMarks(values: weekDays) { value in
+                                        AxisGridLine()
+                                        AxisTick()
+                                        if let dateValue = value.as(Date.self) {
+                                            AxisValueLabel(weekdayInitialMonFirst(for: dateValue))
+                                        }
+                                    }
+                                } else {
+                                    AxisMarks(values: monthDays) { value in
+                                        AxisGridLine()
+                                        AxisTick()
+                                        if let dateValue = value.as(Date.self) {
+                                            let day = calendar.component(.day, from: dateValue)
+                                            AxisValueLabel(String(format: "%02d", day))
+                                        }
                                     }
                                 }
                             }
-                        }
-                        .onDelete { offsets in
-                            vm.log.remove(atOffsets: offsets)
-                            vm.saveData()
-                            visibleCount = min(visibleCount, vm.log.count)
+                            .chartYAxis {
+                                AxisMarks(position: .trailing)
+                            }
+                            .frame(height: 220)
+                            .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
+                        } header: {
+                            Text(rangeMode == .weekly ? "Daily Range (Weekly)" : "Daily Range (Monthly)")
                         }
                         
-                        if hasMore {
-                            Button {
-                                visibleCount = min(visibleCount + 5, vm.log.count)
-                            } label: {
+                        if let avg = averageBPM {
+                            Section {
                                 HStack {
+                                    Text("Average of all sessions")
                                     Spacer()
-                                    Text("Show more")
-                                    Spacer()
+                                    Text("\(avg) BPM")
+                                        .fontWeight(.semibold)
+                                }
+                            }
+                            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                        }
+                        
+                        Section {
+                            ForEach(pagedLog) { entry in
+                                HStack(spacing: 12) {
+                                    if isSelectionMode {
+                                        Image(systemName: selectedEntries.contains(entry.id) ? "checkmark.circle.fill" : "circle")
+                                            .foregroundColor(selectedEntries.contains(entry.id) ? .accentColor : .gray)
+                                    }
+                                    
+                                    Text("\(entry.bpm) BPM")
+                                        .fontWeight(.semibold)
+                                    Spacer(minLength: 8)
+                                    VStack(alignment: .trailing, spacing: 2) {
+                                        Text(entry.date, style: .date)
+                                        Text(entry.date, style: .time)
+                                            .foregroundColor(.gray)
+                                            .font(.caption)
+                                    }
+                                }
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    if isSelectionMode {
+                                        if selectedEntries.contains(entry.id) {
+                                            selectedEntries.remove(entry.id)
+                                        } else {
+                                            selectedEntries.insert(entry.id)
+                                        }
+                                    }
+                                }
+                            }
+                            .onDelete { offsets in
+                                vm.log.remove(atOffsets: offsets)
+                                vm.saveData()
+                                visibleCount = min(visibleCount, vm.log.count)
+                            }
+                            
+                            if hasMore {
+                                Button {
+                                    visibleCount = min(visibleCount + 5, vm.log.count)
+                                } label: {
+                                    HStack {
+                                        Spacer()
+                                        Text("Show more")
+                                            .fontWeight(.semibold)
+                                        Spacer()
+                                    }
+                                }
+                                .buttonStyle(.borderedProminent) // keep visible emphasis
+                                .tint(.red) // only color change
+                            }
+                        } header: {
+                            HStack {
+                                Text("Measurements")
+                                Spacer()
+                                if isSelectionMode {
+                                    Button("Cancel") {
+                                        isSelectionMode = false
+                                        selectedEntries.removeAll()
+                                    }
+                                    .buttonStyle(.plain)
+                                    
+                                    Button("Select All") {
+                                        let ids = vm.log.map(\.id)
+                                        selectedEntries = Set(ids)
+                                    }
+                                    .buttonStyle(.plain)
+                                    
+                                    Button("Delete") {
+                                        vm.log.removeAll { selectedEntries.contains($0.id) }
+                                        vm.saveData()
+                                        isSelectionMode = false
+                                        selectedEntries.removeAll()
+                                        visibleCount = min(visibleCount, vm.log.count)
+                                    }
+                                    .foregroundColor(.red)
+                                    .disabled(selectedEntries.isEmpty)
+                                } else {
+                                    Button("Select") {
+                                        isSelectionMode = true
+                                    }
+                                    .buttonStyle(.plain)
                                 }
                             }
                         }
-                    } header: {
-                        HStack {
-                            Text("Measurements")
-                            Spacer()
-                            if isSelectionMode {
-                                Button("Cancel") {
-                                    isSelectionMode = false
-                                    selectedEntries.removeAll()
-                                }
-                                .buttonStyle(.plain)
-                                
-                                Button("Select All") {
-                                    // Select ALL entries (not just visible)
-                                    let ids = vm.log.map(\.id)
-                                    selectedEntries = Set(ids)
-                                }
-                                .buttonStyle(.plain)
-                                
-                                Button("Delete") {
-                                    vm.log.removeAll { selectedEntries.contains($0.id) }
-                                    vm.saveData()
-                                    isSelectionMode = false
-                                    selectedEntries.removeAll()
-                                    // Adjust visible count if needed
-                                    visibleCount = min(visibleCount, vm.log.count)
-                                }
-                                .foregroundColor(.red)
-                                .disabled(selectedEntries.isEmpty)
-                            } else {
-                                Button("Select") {
-                                    isSelectionMode = true
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
+                        .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
                     }
-                    // Match the same insets as the chart section so the header-to-content spacing matches
-                    .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
                 }
             }
             .navigationTitle("History")
@@ -381,12 +370,9 @@ struct HistoryView: View {
             seedSampleDataIfNeeded()
         }
         .onChange(of: vm.log) { _, _ in
-            // Reset pagination if list shrinks a lot
             visibleCount = min(max(5, visibleCount), vm.log.count)
-            // If selection contains deleted IDs, clean it up
             selectedEntries = selectedEntries.filter { id in vm.log.contains(where: { $0.id == id }) }
         }
-        // Reset forward navigation disablement when switching modes
         .onChange(of: rangeMode) { _, newMode in
             if newMode == .weekly {
                 weekOffset = 0
@@ -413,13 +399,11 @@ private struct DailyBPMRange: Identifiable {
 }
 
 private extension HistoryView {
-    // Return M T W T F S S (Mon-first) for the given date
     func weekdayInitialMonFirst(for date: Date) -> String {
-        // Map calendar weekday (1=Sun…7=Sat) into Mon-first symbols
         let symbols = ["M", "T", "W", "T", "F", "S", "S"]
-        let weekday = calendar.component(.weekday, from: date) // 1..7
-        // Convert to 0..6 with Monday=0
-        let monFirstIndex = (weekday + 5) % 7 // Sun(1)->6, Mon(2)->0, Tue(3)->1, ...
+        let weekday = calendar.component(.weekday, from: date)
+        let monFirstIndex = (weekday + 5) % 7
         return symbols[monFirstIndex]
     }
 }
+

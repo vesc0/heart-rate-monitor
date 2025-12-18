@@ -18,174 +18,172 @@ struct ProfileView: View {
     }
     
     var body: some View {
-        ZStack {
-            // Main content
-            VStack(alignment: .leading, spacing: 20) {
-                Text("Profile")
-                    .font(.largeTitle).bold()
-                    .padding(.bottom, 8)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                
-                if auth.isSignedIn {
-                    // Signed In UI - Modern Card + Details
-                    VStack(spacing: 16) {
-                        profileHeaderCard
-                        
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Details")
-                                .font(.headline)
-                                .foregroundStyle(.secondary)
-                                .padding(.horizontal, 6)
+        NavigationStack {
+            ZStack {
+                // Main content
+                VStack(alignment: .leading, spacing: 20) {
+                    if auth.isSignedIn {
+                        // Signed In UI - Modern Card + Details
+                        VStack(spacing: 16) {
+                            profileHeaderCard
                             
-                            VStack(spacing: 8) {
-                                profileRow(label: "Name", value: name, editable: .name)
-                                profileRow(label: "Email", value: auth.currentEmail ?? email, editable: .email)
-                                profileRow(label: "Age", value: age, editable: .age)
-                                profileRow(label: "Health Issues", value: healthIssues, editable: .health)
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Details")
+                                    .font(.headline)
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, 6)
+                                
+                                VStack(spacing: 8) {
+                                    profileRow(label: "Name", value: name, editable: .name)
+                                    profileRow(label: "Email", value: auth.currentEmail ?? email, editable: .email)
+                                    profileRow(label: "Age", value: age, editable: .age)
+                                    profileRow(label: "Health Issues", value: healthIssues, editable: .health)
+                                }
+                                .padding(12)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                        .fill(Color(.secondarySystemGroupedBackground))
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                        .stroke(Color.black.opacity(0.05), lineWidth: 1)
+                                )
                             }
-                            .padding(12)
-                            .background(
-                                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                    .fill(Color(.secondarySystemGroupedBackground))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                    .stroke(Color.black.opacity(0.05), lineWidth: 1)
-                            )
-                        }
-                        
-                        Button(role: .destructive) {
-                            let generator = UINotificationFeedbackGenerator()
-                            generator.notificationOccurred(.warning)
-                            auth.signOut()
-                        } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: "rectangle.portrait.and.arrow.right")
-                                Text("Sign Out")
-                                    .fontWeight(.semibold)
+                            
+                            Button(role: .destructive) {
+                                let generator = UINotificationFeedbackGenerator()
+                                generator.notificationOccurred(.warning)
+                                auth.signOut()
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "rectangle.portrait.and.arrow.right")
+                                    Text("Sign Out")
+                                        .fontWeight(.semibold)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color.red.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                        .stroke(Color.red.opacity(0.18), lineWidth: 1)
+                                )
                             }
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.red.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                    .stroke(Color.red.opacity(0.18), lineWidth: 1)
-                            )
+                            .buttonStyle(.plain)
+                            .padding(.top, 4)
                         }
-                        .buttonStyle(.plain)
-                        .padding(.top, 4)
-                    }
-                    .padding(.horizontal)
-                    .frame(maxWidth: 520)
-                    .frame(maxWidth: .infinity)
-                } else {
-                    // Logged Out UI
-                    VStack(spacing: 16) {
-                        Text("Log in to access your profile, sync features,\nand view personal stats.")
-                            .font(.body)
-                            .multilineTextAlignment(.center)
-                            .foregroundColor(.secondary)
-                            .padding(.bottom, 2)
-                        
-                        Button {
-                            showAuthPopup = true
-                        } label: {
-                            HStack {
-                                Image(systemName: "person.crop.circle.badge.plus")
-                                Text("Log In or Sign Up")
-                                    .fontWeight(.semibold)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(LinearGradient(colors: [.pink, .red], startPoint: .topLeading, endPoint: .bottomTrailing),
-                                        in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                            .foregroundColor(.white)
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.top, 8)
-                    }
-                    .padding(.horizontal)
-                    .frame(maxWidth: 420)
-                    .frame(maxWidth: .infinity)
-                }
-                
-                Spacer()
-            }
-            .padding(.top, 24)
-            .blur(radius: showAuthPopup ? 8 : 0)
-            .animation(.easeInOut(duration: 0.15), value: showAuthPopup)
-            .disabled(showAuthPopup)
-            
-            // Modal popup for login/signup
-            if showAuthPopup {
-                Color.black.opacity(0.32)
-                    .ignoresSafeArea()
-                    .transition(.opacity)
-                    .zIndex(1)
-                
-                VStack(spacing: 0) {
-                    HStack {
-                        Spacer()
-                        Button {
-                            showAuthPopup = false
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 30))
+                        .padding(.horizontal)
+                        .frame(maxWidth: 520)
+                        .frame(maxWidth: .infinity)
+                    } else {
+                        // Logged Out UI
+                        VStack(spacing: 16) {
+                            Text("Log in to access your profile, sync features,\nand view personal stats.")
+                                .font(.body)
+                                .multilineTextAlignment(.center)
                                 .foregroundColor(.secondary)
-                                .padding(5)
+                                .padding(.bottom, 2)
+                            
+                            Button {
+                                showAuthPopup = true
+                            } label: {
+                                HStack {
+                                    Image(systemName: "person.crop.circle.badge.plus")
+                                    Text("Log In or Sign Up")
+                                        .fontWeight(.semibold)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(LinearGradient(colors: [.pink, .red], startPoint: .topLeading, endPoint: .bottomTrailing),
+                                            in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                                .foregroundColor(.white)
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.top, 8)
                         }
+                        .padding(.horizontal)
+                        .frame(maxWidth: 420)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                     }
-                    .padding(.horizontal, 8)
-                    .padding(.top, 8)
                     
-                    Picker("", selection: $selectedAuthTab) {
-                        Text("Log In").tag(0)
-                        Text("Sign Up").tag(1)
-                    }
-                    .pickerStyle(.segmented)
-                    .padding(.horizontal)
-                    .padding(.bottom, 8)
+                    Spacer()
+                }
+                .padding(.top, 24)
+                .blur(radius: showAuthPopup ? 8 : 0)
+                .animation(.easeInOut(duration: 0.15), value: showAuthPopup)
+                .disabled(showAuthPopup)
+                
+                // Modal popup for login/signup
+                if showAuthPopup {
+                    Color.black.opacity(0.32)
+                        .ignoresSafeArea()
+                        .transition(.opacity)
+                        .zIndex(1)
                     
-                    // Scroll to avoid overflow if keyboard/content is taller than the popup
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 0) {
-                            if selectedAuthTab == 0 {
-                                LoginView(inPopup: true)
-                                    .environmentObject(auth)
-                                    .padding(.horizontal)
-                            } else {
-                                SignUpView(inPopup: true)
-                                    .environmentObject(auth)
-                                    .padding(.horizontal)
+                    VStack(spacing: 0) {
+                        HStack {
+                            Spacer()
+                            Button {
+                                showAuthPopup = false
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 30))
+                                    .foregroundColor(.secondary)
+                                    .padding(5)
                             }
                         }
-                        .padding(.bottom, 12)
+                        .padding(.horizontal, 8)
+                        .padding(.top, 8)
+                        
+                        Picker("", selection: $selectedAuthTab) {
+                            Text("Log In").tag(0)
+                            Text("Sign Up").tag(1)
+                        }
+                        .pickerStyle(.segmented)
+                        .padding(.horizontal)
+                        .padding(.bottom, 8)
+                        
+                        // Scroll to avoid overflow if keyboard/content is taller than the popup
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 0) {
+                                if selectedAuthTab == 0 {
+                                    LoginView(inPopup: true)
+                                        .environmentObject(auth)
+                                        .padding(.horizontal)
+                                } else {
+                                    SignUpView(inPopup: true)
+                                        .environmentObject(auth)
+                                        .padding(.horizontal)
+                                }
+                            }
+                            .padding(.bottom, 12)
+                        }
+                        .scrollIndicators(.hidden)
                     }
-                    .scrollIndicators(.hidden)
+                    .frame(width: 370, height: selectedAuthTab == 0 ? 460 : 540)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+                    .clipped()
+                    .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+                    .shadow(color: .black.opacity(0.13), radius: 32, x: 0, y: 12)
+                    .padding()
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .zIndex(2)
                 }
-                .frame(width: 370, height: selectedAuthTab == 0 ? 460 : 540)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-                .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-                .clipped()
-                .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-                .shadow(color: .black.opacity(0.13), radius: 32, x: 0, y: 12)
-                .padding()
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-                .zIndex(2)
             }
-        }
-        .sheet(item: $editingField) { field in
-            EditFieldSheet(
-                field: field,
-                value: binding(for: field),
-                onDismiss: { editingField = nil }
-            )
-        }
-        .background(Color(.systemGroupedBackground))
-        .animation(.easeInOut(duration: 0.18), value: showAuthPopup)
-        .onChange(of: auth.isSignedIn) { _, newVal in
-            if newVal { showAuthPopup = false }
-            if newVal { email = auth.currentEmail ?? "" }
+            .sheet(item: $editingField) { field in
+                EditFieldSheet(
+                    field: field,
+                    value: binding(for: field),
+                    onDismiss: { editingField = nil }
+                )
+            }
+            .background(Color(.systemGroupedBackground))
+            .animation(.easeInOut(duration: 0.18), value: showAuthPopup)
+            .onChange(of: auth.isSignedIn) { _, newVal in
+                if newVal { showAuthPopup = false }
+                if newVal { email = auth.currentEmail ?? "" }
+            }
+            .navigationTitle("Profile")
         }
     }
     
@@ -355,3 +353,4 @@ struct EditFieldSheet: View {
         }
     }
 }
+

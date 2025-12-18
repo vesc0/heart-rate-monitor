@@ -12,6 +12,8 @@ struct Heart_Rate_MonitorApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .tint(.red) // Global red accent/tint for tabs, controls, etc.
         }
     }
 }
+
