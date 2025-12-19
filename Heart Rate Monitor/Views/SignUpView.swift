@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SignUpView: View {
     @EnvironmentObject private var auth: AuthViewModel
+    @Environment(\.colorScheme) private var colorScheme
     @State private var email = ""
     @State private var password = ""
     @State private var confirm = ""
@@ -34,18 +35,30 @@ struct SignUpView: View {
                     .textInputAutocapitalization(.never)
                     .keyboardType(.emailAddress)
                     .autocorrectionDisabled()
-                    .padding()
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 14)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(Color(.systemBackground))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(Color(.separator), lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(colorScheme == .light ? 0.06 : 0), radius: 8, x: 0, y: 3)
+                    .foregroundColor(.primary)
                 
                 HStack {
                     if showPassword {
                         TextField("Password (min 6 characters)", text: $password)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
+                            .foregroundColor(.primary)
                     } else {
                         SecureField("Password (min 6 characters)", text: $password)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
+                            .foregroundColor(.primary)
                     }
                     Button {
                         withAnimation(.easeInOut(duration: 0.15)) {
@@ -56,14 +69,32 @@ struct SignUpView: View {
                             .foregroundColor(.secondary)
                     }
                 }
-                .padding()
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 14)
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Color(.systemBackground))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(Color(.separator), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(colorScheme == .light ? 0.06 : 0), radius: 8, x: 0, y: 3)
                 
                 SecureField("Confirm Password", text: $confirm)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
-                    .padding()
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 14)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(Color(.systemBackground))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(Color(.separator), lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(colorScheme == .light ? 0.06 : 0), radius: 8, x: 0, y: 3)
                 
                 if !passwordsMatch && !confirm.isEmpty {
                     Text("Passwords do not match.")
