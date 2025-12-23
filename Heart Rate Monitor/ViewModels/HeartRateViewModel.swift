@@ -15,6 +15,7 @@ class HeartRateViewModel: ObservableObject {
     @Published var heartScale: CGFloat = 1.0
     @Published var secondsLeft: Int = 0
     @Published var log: [HeartRateEntry] = []
+    @Published var canShowBPM: Bool = false
 
     // Taps & computation
     private var tapTimes: [Date] = []
@@ -31,11 +32,13 @@ class HeartRateViewModel: ObservableObject {
     private let previewDuration: TimeInterval = 10
     private let minValidInterval: TimeInterval = 0.27
     private let maxValidInterval: TimeInterval = 1.50
+    private let bpmRevealAfter: TimeInterval = 4.0
 
     // Timers
     private var phaseTimer: Timer?
     private var countdownTimer: Timer?
     private var autoBeatTimer: Timer?
+    private var bpmRevealTimer: Timer?
 
     // Persistence
     private let saveKey = "HeartRateLog"
@@ -44,6 +47,7 @@ class HeartRateViewModel: ObservableObject {
 
     // MARK: - Session
     func startSession() {
+        invalidateAllTimers()
         resetInMemoryOnly()
         phase = .measuring
         // Timer starts on first tap
@@ -52,12 +56,14 @@ class HeartRateViewModel: ObservableObject {
     func recordTap() {
         guard phase == .measuring || phase == .preview else { return }
         let now = Date()
-        tapTimes.append(now)
-
+        
         // If this is the first tap in measuring, start the 12s measurement countdown
-        if phase == .measuring && tapTimes.count == 1 {
+        if phase == .measuring && tapTimes.isEmpty {
             startPhase(duration: measureDuration)
+            scheduleBPMReveal(after: bpmRevealAfter)
         }
+        
+        tapTimes.append(now)
 
         // Compute interval if not first tap
         if let last = tapTimes.dropLast().last {
@@ -67,24 +73,23 @@ class HeartRateViewModel: ObservableObject {
             validIntervals.append(interval)
             updateLiveBPM()
 
-            // Always pulse heart on tap
+            // Pulse heart on user tap only
             pulseHeart()
         }
     }
 
     private func finishMeasuring() {
+        // Manual mode: end immediately at 12s
         updateLiveBPM()
-        phase = .preview
-        startAutoBeat()
-        startPhase(duration: previewDuration)
+        endSession()
     }
 
     private func endSession() {
         let finalBPM = computeAverageBPM(from: validIntervals)
         currentBPM = finalBPM
 
-        // Only save if we're in preview phase (means it wasn't stopped early)
-        if let bpm = finalBPM, phase == .preview {
+        // Only save if BPM is valid
+        if let bpm = finalBPM {
             let entry = HeartRateEntry(bpm: bpm, date: Date())
             log.insert(entry, at: 0)
             saveData()
@@ -126,15 +131,19 @@ class HeartRateViewModel: ObservableObject {
             }
         }
     }
-
-    // MARK: - Heart beat
-    private func startAutoBeat() {
-        autoBeatTimer?.invalidate()
-        guard let bpm = currentBPM, bpm > 0 else { return }
-        let interval = 60.0 / Double(bpm)
-        autoBeatTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
-            self?.pulseHeart()
+    
+    private func scheduleBPMReveal(after delay: TimeInterval) {
+        canShowBPM = false
+        bpmRevealTimer?.invalidate()
+        bpmRevealTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
+            self?.canShowBPM = true
         }
+    }
+
+    // MARK: - Heart beat (manual: only on tap)
+    private func startAutoBeat() {
+        // Not used in manual mode anymore
+        autoBeatTimer?.invalidate()
     }
 
     private func pulseHeart() {
@@ -152,7 +161,7 @@ class HeartRateViewModel: ObservableObject {
     private func updateLiveBPM() {
         let bpm = computeAverageBPM(from: Array(validIntervals.suffix(smoothingWindow)))
         currentBPM = bpm
-        if phase == .preview { startAutoBeat() }
+        // No autoBeat in manual
     }
 
     private func computeAverageBPM(from intervals: [TimeInterval]) -> Int? {
@@ -169,12 +178,14 @@ class HeartRateViewModel: ObservableObject {
         secondsLeft = 0
         tapTimes.removeAll()
         validIntervals.removeAll()
+        canShowBPM = false
     }
 
     private func invalidateAllTimers() {
         phaseTimer?.invalidate(); phaseTimer = nil
         countdownTimer?.invalidate(); countdownTimer = nil
         autoBeatTimer?.invalidate(); autoBeatTimer = nil
+        bpmRevealTimer?.invalidate(); bpmRevealTimer = nil
     }
 
     // MARK: - Persistence
@@ -191,3 +202,4 @@ class HeartRateViewModel: ObservableObject {
         }
     }
 }
+

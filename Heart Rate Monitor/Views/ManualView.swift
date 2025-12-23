@@ -29,7 +29,7 @@ struct ManualView: View {
                             .font(.title2)
                             .fontWeight(.bold)
                         
-                        Text("Measure your heart rate by tapping the button in rhythm with your heartbeat. Place two fingers on your neck or wrist to find your pulse, then tap for 12 seconds to get an accurate reading.")
+                        Text("Measure your heart rate by tapping the heart in rhythm with your heartbeat. Place two fingers on your neck or wrist to find your pulse, then tap for 12 seconds to get an accurate reading.")
                             .multilineTextAlignment(.center)
                             .foregroundColor(.secondary)
                             .padding(.horizontal)
@@ -47,7 +47,7 @@ struct ManualView: View {
                     VStack(spacing: 16) {
                         Spacer()
                         
-                        // Centered heart with circular countdown
+                        // Tappable heart with circular countdown
                         HeartTimerView(
                             heartScale: vm.heartScale,
                             secondsLeft: vm.secondsLeft,
@@ -55,23 +55,26 @@ struct ManualView: View {
                             heartSize: 96,
                             color: .red
                         )
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            vm.recordTap()
+                        }
                         
-                        Text("Tap with your heartbeat")
-                        
-                        if !vm.hasTapped {
-                            Text("Waiting for first tap…")
+                        if let bpm = vm.currentBPM, vm.canShowBPM {
+                            Text("\(bpm) BPM")
+                                .font(.system(size: 42, weight: .bold))
+                        } else if !vm.hasTapped {
+                            Text("Tap the heart to begin…")
+                                .foregroundColor(.gray)
+                        } else {
+                            Text("Keep tapping…")
                                 .foregroundColor(.gray)
                         }
                         
                         Spacer()
                         
                         VStack(spacing: 20) {
-                            Button("Tap") { vm.recordTap() }
-                                .buttonStyle(.bordered)
-                                .controlSize(.large)
-                                .fontWeight(.bold)
-                                .tint(.red) // keep style, only color
-                            
+                            // No Tap button; heart is tappable
                             Button("Stop") { vm.stopSession() }
                                 .buttonStyle(.bordered)
                                 .tint(.red) // keep style, only color
@@ -79,9 +82,9 @@ struct ManualView: View {
                     }
 
                 case .preview:
+                    // Manual mode no longer uses preview; if reached, fallback to measuring UI
                     VStack(spacing: 16) {
                         Spacer()
-                        
                         HeartTimerView(
                             heartScale: vm.heartScale,
                             secondsLeft: vm.secondsLeft,
@@ -89,27 +92,22 @@ struct ManualView: View {
                             heartSize: 96,
                             color: .red
                         )
+                        .contentShape(Rectangle())
+                        .onTapGesture { vm.recordTap() }
                         
                         if let bpm = vm.currentBPM {
                             Text("\(bpm) BPM")
                                 .font(.system(size: 42, weight: .bold))
                         } else {
-                            Text("Waiting for taps…")
+                            Text("Keep tapping…")
                                 .foregroundColor(.gray)
                         }
-                        
                         Spacer()
                         
                         VStack(spacing: 20) {
-                            Button("Tap") { vm.recordTap() }
-                                .buttonStyle(.bordered)
-                                .controlSize(.large)
-                                .fontWeight(.bold)
-                                .tint(.red) // keep style, only color
-                            
                             Button("Stop") { vm.stopSession() }
                                 .buttonStyle(.bordered)
-                                .tint(.red) // keep style, only color
+                                .tint(.red)
                         }
                     }
 
