@@ -19,7 +19,8 @@ This is not a medical app. It is intended for entertainment and educational purp
 
 - **Manual Mode**: Tap along with your pulse to record your heart rate.
 - **Automatic Mode**: Place your finger over the main back camera. The app detects your pulse by analyzing subtle color changes.
-- **History**: View your past sessions, delete entries, and see your average heart rate.
+- **History**: View your past sessions, delete entries, see your average heart rate, and weekly/monthly trends.
+- **Profile**: Log in or sign up to save your measurements. Coming soon!
 
 ##  Tech Stack
 
@@ -50,25 +51,32 @@ open "Heart Rate Monitor.xcodeproj"
 
 ##  Usage
 
-1. Select **Manual** tab — tap “Start Manual Session”, then tap in rhythm with your pulse.
+1. Select **Manual** tab — tap “Start Manual Session”, then tap the heart icon in rhythm with your pulse.
 2. Select **Automatic** tab — tap “Start Automatic Session”, cover the rear main camera lens, and wait a few seconds. The app will prompt for camera permission the first time you start an automatic session, so make sure to allow it.
-3. View results in **History** tab — swipe to delete a single entry, or select and delete multiple entries. View your average heart rate.
+3. View results in **History** tab — swipe to delete a single entry, or select and delete multiple entries. View your average heart rate. View a graph with weekly or monthly trends.
 
 ##  Project Architecture
 
 ```
 HeartRateMonitor/
 ├── Models/
-│   └── HeartRateEntry.swift
+│   ├── HeartRateEntry.swift
+│   └── SessionPhase.swift
 ├── ViewModels/
-│   ├── HeartRateViewModel.swift
-│   └── AutoHeartRateViewModel.swift
+│   ├── AutoHeartRateViewModel.swift
+│   └── HeartRateViewModel.swift
 ├── Views/
-│   ├── ContentView.swift (TabView)
-│   ├── ManualView.swift
+│   ├── AuthGateView.swift
+│   ├── AuthViewModel.swift
 │   ├── AutoView.swift
-│   └── HistoryView.swift
-│   └── CameraPreview.swift
+│   ├── CameraPreview.swift
+│   ├── ContentView.swift
+│   ├── HeartTimerView.swift
+│   ├── HistryView.swift
+│   ├── LoginView.swift
+│   ├── Manualview.swift
+│   ├── ProfileView.swift
+│   └── SignUpView.swift
 ```
 
 ## Screenshots
@@ -83,4 +91,16 @@ HeartRateMonitor/
 
 <p align="center">
   <img src="screenshots/history.PNG" alt="history" width="300">
+</p>
+
+<p align="center">
+  <img src="screenshots/login.PNG" alt="login" width="300">
+</p>
+
+<p align="center">
+  <img src="screenshots/signup.PNG" alt="signup" width="300">
+</p>
+
+<p align="center">
+  <img src="screenshots/profile.PNG" alt="profile" width="300">
 </p>
