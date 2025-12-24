@@ -16,9 +16,11 @@ final class AutoHeartRateViewModel: NSObject, ObservableObject {
     @Published var secondsLeft: Int = 0
     @Published var heartScale: CGFloat = 1.0
     @Published var errorMessage: String?
+    @Published var canShowBPM: Bool = false
     
     // State
     private var stoppedEarly = false
+    private var firstBeatWallTime: CFTimeInterval?
 
     // Capture
     let session = AVCaptureSession()
@@ -29,6 +31,7 @@ final class AutoHeartRateViewModel: NSObject, ObservableObject {
     // Timers
     private var phaseTimer: Timer?
     private var countdownTimer: Timer?
+    private var bpmRevealTimer: Timer?
 
     // BPM detection (simple, robust starter)
     private var lastCentered: Double = 0
@@ -37,14 +40,16 @@ final class AutoHeartRateViewModel: NSObject, ObservableObject {
     private let windowSize = 45           // ~0.75s at 60fps
     private var lastPeakTS: CFTimeInterval?
     private var intervals: [TimeInterval] = []
+    private var beatsCount: Int = 0
 
-    // Constraints (same as manual)
+    // Constraints
     private let minInt: TimeInterval = 0.27  // ~220 bpm
     private let maxInt: TimeInterval = 1.50  // ~40 bpm
 
     // Durations
     private let measureDuration: TimeInterval = 12
-    private let previewDuration: TimeInterval = 10
+    private let bpmRevealAfter: TimeInterval = 4.0
+    private let calibrationBeatsRequired = 3
 
     // MARK: Session lifecycle
     func startSession() {
@@ -62,7 +67,7 @@ final class AutoHeartRateViewModel: NSObject, ObservableObject {
             DispatchQueue.main.async {
                 guard self.session.isRunning else { return }
                 self.turnTorch(on: true)
-                self.startPhase(duration: self.measureDuration)
+                // The 12s timer will start on the first valid detected beat.
             }
         }
     }
@@ -72,12 +77,6 @@ final class AutoHeartRateViewModel: NSObject, ObservableObject {
         phase = .idle
         cleanupCamera()
         invalidateTimers()
-    }
-
-    private func finishMeasuring() {
-        phase = .preview
-        startPhase(duration: previewDuration)
-        // Keep detecting beats and updating BPM live.
     }
 
     private func endSession() {
@@ -126,18 +125,34 @@ final class AutoHeartRateViewModel: NSObject, ObservableObject {
 
         phaseTimer?.invalidate()
         phaseTimer = Timer.scheduledTimer(withTimeInterval: duration, repeats: false) { [weak self] _ in
-            guard let self else { return }
-            if self.phase == .measuring {
-                self.finishMeasuring()
-            } else if self.phase == .preview {
-                self.endSession()
-            }
+            self?.endSession()
         }
+    }
+    
+    private func scheduleBPMReveal(after delay: TimeInterval) {
+        canShowBPM = false
+        bpmRevealTimer?.invalidate()
+        bpmRevealTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
+            self?.updateCanShowBPM()
+        }
+    }
+    
+    private func updateCanShowBPM() {
+        // Reveal only when both calibration beats AND time threshold are met
+        let beatsOK = beatsCount >= calibrationBeatsRequired
+        let timeOK: Bool
+        if let t0 = firstBeatWallTime {
+            timeOK = (CACurrentMediaTime() - t0) >= bpmRevealAfter
+        } else {
+            timeOK = false
+        }
+        canShowBPM = beatsOK && timeOK
     }
 
     private func invalidateTimers() {
         phaseTimer?.invalidate(); phaseTimer = nil
         countdownTimer?.invalidate(); countdownTimer = nil
+        bpmRevealTimer?.invalidate(); bpmRevealTimer = nil
     }
 
     // MARK: Capture setup
@@ -225,6 +240,9 @@ final class AutoHeartRateViewModel: NSObject, ObservableObject {
         lastCentered = 0
         lastPeakTS = nil
         intervals.removeAll()
+        beatsCount = 0
+        firstBeatWallTime = nil
+        canShowBPM = false
     }
 
     private func handleSample(_ redMean: Double) {
@@ -253,12 +271,25 @@ final class AutoHeartRateViewModel: NSObject, ObservableObject {
             if let last = lastPeakTS {
                 let dt = now - last
                 if dt >= minInt && dt <= maxInt {
+                    // Valid beat
                     intervals.append(dt)
+                    beatsCount += 1
                     DispatchQueue.main.async {
+                        // Start the single 12s measurement on the first valid beat
+                        if self.firstBeatWallTime == nil {
+                            self.firstBeatWallTime = now
+                            self.startPhase(duration: self.measureDuration)
+                            self.scheduleBPMReveal(after: self.bpmRevealAfter)
+                        }
+                        // Update BPM using last few intervals
                         self.currentBPM = self.computeBPM(from: Array(self.intervals.suffix(5)))
+                        self.updateCanShowBPM()
                         self.pulseHeart() // beat on every detected peak
                     }
                 }
+            } else {
+                // First observed peak timestamp (may not be valid until we have interval)
+                // Wait for the next peak to compute a valid dt.
             }
             lastPeakTS = now
         }
@@ -287,7 +318,7 @@ final class AutoHeartRateViewModel: NSObject, ObservableObject {
 extension AutoHeartRateViewModel: AVCaptureVideoDataOutputSampleBufferDelegate {
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
 
-        guard phase == .measuring || phase == .preview else { return }
+        guard phase == .measuring else { return }
         guard let px = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
 
         CVPixelBufferLockBaseAddress(px, .readOnly)
@@ -319,3 +350,4 @@ extension AutoHeartRateViewModel: AVCaptureVideoDataOutputSampleBufferDelegate {
         handleSample(redMean)
     }
 }
+

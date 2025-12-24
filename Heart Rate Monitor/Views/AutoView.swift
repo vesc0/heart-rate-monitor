@@ -17,7 +17,6 @@ struct AutoView: View {
     private var totalForCurrentPhase: Int {
         switch autoVM.phase {
         case .measuring: return 12
-        case .preview: return 10
         default: return 0
         }
     }
@@ -26,7 +25,7 @@ struct AutoView: View {
         NavigationStack {
             ZStack {
                 // Camera preview only during measuring
-                if autoVM.phase == .measuring || autoVM.phase == .preview {
+                if autoVM.phase == .measuring {
                     VStack(spacing: 0) {
                         CameraPreview(session: autoVM.session)
                             .frame(height: 160)
@@ -47,7 +46,7 @@ struct AutoView: View {
                                 .font(.title2)
                                 .fontWeight(.bold)
                             
-                            Text("Measure your heart rate using your device's camera and flashlight. Simply place your fingertip over the camera lens and keep it still. The app will detect subtle color changes to calculate your heart rate.")
+                            Text("Place your fingertip over the camera and keep it still. The app will detect subtle color changes to calculate your heart rate. The 12-second timer starts after we detect your first beats.")
                                 .multilineTextAlignment(.center)
                                 .foregroundColor(.secondary)
                                 .padding(.horizontal)
@@ -62,7 +61,7 @@ struct AutoView: View {
                             .padding(.top, 8)
                         }
                         .frame(maxHeight: .infinity, alignment: .center)
-                    } else if autoVM.phase == .measuring || autoVM.phase == .preview {
+                    } else if autoVM.phase == .measuring {
                         VStack(spacing: 16) {
                             Spacer()
                             
@@ -75,17 +74,12 @@ struct AutoView: View {
                                 color: .red
                             )
                             
-                            if autoVM.phase == .measuring {
-                                Text("Keep fingertip on the camera")
-                                    .foregroundColor(.secondary)
+                            if autoVM.canShowBPM, let bpm = autoVM.currentBPM {
+                                Text("\(bpm) BPM")
+                                    .font(.system(size: 42, weight: .bold))
                             } else {
-                                if let bpm = autoVM.currentBPM {
-                                    Text("\(bpm) BPM")
-                                        .font(.system(size: 42, weight: .bold))
-                                } else {
-                                    Text("Calibrating…")
-                                        .foregroundColor(.secondary)
-                                }
+                                Text("Calibrating… keep fingertip on camera")
+                                    .foregroundColor(.secondary)
                             }
                             
                             Spacer()
@@ -121,7 +115,7 @@ struct AutoView: View {
                     
                     // Bottom-fixed stop button during measurement
                     Group {
-                        if autoVM.phase == .measuring || autoVM.phase == .preview {
+                        if autoVM.phase == .measuring {
                             Button(role: .destructive) {
                                 autoVM.stopSessionEarly()
                             } label: {
