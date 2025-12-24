@@ -82,25 +82,25 @@ HeartRateMonitor/
 ## Screenshots
 
 <p align="center">
-  <img src="screenshots/auto-mode.PNG" alt="auto-mode" width="300">
+  <img src="screenshots/auto-mode.png" alt="auto-mode" width="300">
 </p>
 
 <p align="center">
-  <img src="screenshots/manual-mode.PNG" alt="manual-mode" width="300">
+  <img src="screenshots/manual-mode.png" alt="manual-mode" width="300">
 </p>
 
 <p align="center">
-  <img src="screenshots/history.PNG" alt="history" width="300">
+  <img src="screenshots/history.png" alt="history" width="300">
 </p>
 
 <p align="center">
-  <img src="screenshots/login.PNG" alt="login" width="300">
+  <img src="screenshots/login.png" alt="login" width="300">
 </p>
 
 <p align="center">
-  <img src="screenshots/signup.PNG" alt="signup" width="300">
+  <img src="screenshots/signup.png" alt="signup" width="300">
 </p>
 
 <p align="center">
-  <img src="screenshots/profile.PNG" alt="profile" width="300">
+  <img src="screenshots/profile.png" alt="profile" width="300">
 </p>
