@@ -44,11 +44,9 @@ struct HistoryView: View {
         for d in 0..<daysBack {
             guard let dayDate = calendar.date(byAdding: .day, value: -d, to: todayStart) else { continue }
             let count = Int.random(in: 1...3)
-            // Create plausible BPMs per day around a baseline that drifts slowly
-            let baseline = 68 + Int(6 * sin(Double(d) / 9.0)) // mild variation
+            let baseline = 68 + Int(6 * sin(Double(d) / 9.0))
             for i in 0..<count {
                 let bpm = max(45, min(160, baseline + Int.random(in: -12...14)))
-                // Spread times across the day
                 let hour = [9, 14, 20].randomElement() ?? 12
                 let minute = Int.random(in: 0..<60)
                 var comps = calendar.dateComponents([.year, .month, .day], from: dayDate)
@@ -58,7 +56,6 @@ struct HistoryView: View {
                 entries.append(HeartRateEntry(bpm: bpm, date: ts))
             }
         }
-        // Sort newest first to match existing UI expectations
         entries.sort { $0.date > $1.date }
         vm.log = entries
         vm.saveData()
@@ -98,6 +95,12 @@ struct HistoryView: View {
         return (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: start) }
     }
     
+    // Day boundary ticks for weekly (8 boundaries around 7 days)
+    private var weekBoundaryDays: [Date] {
+        let (start, _) = currentWeekRange
+        return (0...7).compactMap { calendar.date(byAdding: .day, value: $0, to: start) }
+    }
+    
     private var currentMonthStart: Date {
         let comps = calendar.dateComponents([.year, .month], from: todayStart)
         let startOfCurrent = calendar.date(from: comps) ?? todayStart
@@ -121,6 +124,17 @@ struct HistoryView: View {
         return days
     }
     
+    // Ticks for 1, 10, 20, and last day of the month
+    private var monthlyTickDays: [Date] {
+        let (start, end) = currentMonthRange
+        var ticks: [Date] = []
+        ticks.append(start)
+        if let d10 = calendar.date(byAdding: .day, value: 9, to: start) { ticks.append(d10) }
+        if let d20 = calendar.date(byAdding: .day, value: 19, to: start) { ticks.append(d20) }
+        ticks.append(end)
+        return ticks
+    }
+    
     private var dailyRangesForCurrentWeek: [DailyBPMRange] {
         let dict = Dictionary(uniqueKeysWithValues: dailyRangesAll.map { ($0.day, $0) })
         return weekDays.compactMap { dict[$0] }
@@ -131,14 +145,12 @@ struct HistoryView: View {
         return monthDays.compactMap { dict[$0] }
     }
     
-    // Period stats (min/avg/max) for the visible week/month
+    // Period stats (min/avg/max)
     private var weekStats: PeriodStats? {
-        let days = dailyRangesForCurrentWeek
-        return aggregateStats(for: days)
+        aggregateStats(for: dailyRangesForCurrentWeek)
     }
     private var monthStats: PeriodStats? {
-        let days = dailyRangesForCurrentMonth
-        return aggregateStats(for: days)
+        aggregateStats(for: dailyRangesForCurrentMonth)
     }
     private func aggregateStats(for days: [DailyBPMRange]) -> PeriodStats? {
         guard !days.isEmpty else { return nil }
@@ -152,26 +164,21 @@ struct HistoryView: View {
         return PeriodStats(min: minVal, avg: avgVal, max: maxVal)
     }
     
-    // Stats to display (respects selected day on weekly)
+    // Stats to display
     private var displayStats: PeriodStats? {
         switch rangeMode {
         case .weekly:
-            if let sel = selectedDay {
-                // Stats for the selected single day
-                if let day = dailyRangesAll.first(where: { calendar.isDate($0.day, inSameDayAs: sel) }) {
-                    return PeriodStats(min: day.min, avg: day.avg, max: day.max)
-                } else {
-                    return nil
-                }
-            } else {
-                return weekStats
+            if let sel = selectedDay,
+               let day = dailyRangesAll.first(where: { calendar.isDate($0.day, inSameDayAs: sel) }) {
+                return PeriodStats(min: day.min, avg: day.avg, max: day.max)
             }
+            return weekStats
         case .monthly:
             return monthStats
         }
     }
     
-    // Measurements filtering based on selection and current period
+    // Measurements filtering
     private var filteredMeasurements: [HeartRateEntry] {
         switch rangeMode {
         case .weekly:
@@ -247,6 +254,7 @@ struct HistoryView: View {
                                 Text("Monthly").tag(RangeMode.monthly)
                             }
                             .pickerStyle(.segmented)
+                            .listRowSeparator(.hidden)
                             
                             HStack {
                                 Button {
@@ -286,80 +294,13 @@ struct HistoryView: View {
                                 .opacity((rangeMode == .weekly ? weekOffset == 0 : monthOffset == 0) ? 0.4 : 1)
                             }
                             .padding(.top, 4)
+                            .listRowSeparator(.hidden)
                             
-                            let baseData: [DailyBPMRange] = (rangeMode == .weekly) ? dailyRangesForCurrentWeek : dailyRangesForCurrentMonth
-                            let chartData: [DailyBPMRange] = baseData.filter { $0.min != 0 || $0.max != 0 }
-                            
-                            Chart(chartData) { day in
-                                ChartBar(
-                                    day: day,
-                                    rangeMode: rangeMode,
-                                    isSelected: isSelected(day),
-                                    hasSelection: selectedDay != nil,
-                                    labelProvider: { dayLabel(for: day.day) }
-                                )
-                            }
-                            // Precise tap handling: only near a day’s line (weekly only)
-                            .chartOverlay { proxy in
-                                if rangeMode == .weekly {
-                                    GeometryReader { _ in
-                                        Color.clear
-                                            .contentShape(Rectangle())
-                                            .gesture(
-                                                DragGesture(minimumDistance: 0)
-                                                    .onEnded { value in
-                                                        guard let tappedDate: Date = proxy.value(atX: value.location.x) else { return }
-                                                        let dayStart = calendar.startOfDay(for: tappedDate)
-                                                        guard let dayData = dailyRangesForCurrentWeek.first(where: { calendar.isDate($0.day, inSameDayAs: dayStart) }) else { return }
-                                                        guard let dayX: CGFloat = proxy.position(forX: dayData.day) else { return }
-                                                        let dx = abs(dayX - value.location.x)
-                                                        let xHitSlop: CGFloat = 18
-                                                        guard dx <= xHitSlop else { return }
-                                                        guard
-                                                            let yMin: CGFloat = proxy.position(forY: Double(dayData.min)),
-                                                            let yMax: CGFloat = proxy.position(forY: Double(dayData.max))
-                                                        else { return }
-                                                        let yLow = min(yMin, yMax)
-                                                        let yHigh = max(yMin, yMax)
-                                                        let yPadding: CGFloat = 14
-                                                        let yHit = (value.location.y >= (yLow - yPadding)) && (value.location.y <= (yHigh + yPadding))
-                                                        guard yHit else { return }
-                                                        toggleSelection(for: dayData.day)
-                                                    }
-                                            )
-                                    }
-                                }
-                            }
-                            .chartXAxis {
-                                if rangeMode == .weekly {
-                                    AxisMarks(values: weekDays) { value in
-                                        AxisGridLine()
-                                        AxisTick()
-                                        if let dateValue = value.as(Date.self) {
-                                            AxisValueLabel(weekdayInitialMonFirst(for: dateValue))
-                                        }
-                                    }
-                                } else {
-                                    AxisMarks(values: monthDays) { value in
-                                        AxisGridLine()
-                                        AxisTick()
-                                        if let dateValue = value.as(Date.self) {
-                                            let dayNum = calendar.component(.day, from: dateValue)
-                                            if [1, 10, 20, 30].contains(dayNum) {
-                                                AxisValueLabel(String(dayNum))
-                                            } else {
-                                                AxisValueLabel("")
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            .chartYAxis {
-                                AxisMarks(position: .trailing)
-                            }
-                            .frame(height: 240)
-                            .padding(.bottom, 6)
-                            .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
+                            chartView()
+                                .frame(height: 240)
+                                .padding(.bottom, 6)
+                                .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
+                                .listRowSeparator(.hidden)
                         } header: {
                             Text("Daily Range")
                         } footer: {
@@ -383,7 +324,7 @@ struct HistoryView: View {
                             ForEach(pagedLog) { entry in
                                 HStack(spacing: 12) {
                                     if isSelectionMode {
-                                        Image(systemName: selectedEntries.contains(entry.id) ? "checkmark.circle.fill" : "circle")
+                                        Image(systemName: selectedEntries.contains(entry.id) ? "checkmark.circle_fill" : "circle")
                                             .foregroundColor(selectedEntries.contains(entry.id) ? .accentColor : .gray)
                                     }
                                     
@@ -391,7 +332,6 @@ struct HistoryView: View {
                                         .fontWeight(.semibold)
                                     Spacer(minLength: 8)
                                     VStack(alignment: .trailing, spacing: 2) {
-                                        // Shorter date format: "Dec 27, 2025"
                                         Text(entry.date, format: .dateTime.month(.abbreviated).day().year())
                                         Text(entry.date, style: .time)
                                             .foregroundColor(.gray)
@@ -514,11 +454,11 @@ private struct PeriodStats {
 }
 
 private extension HistoryView {
-    func weekdayInitialMonFirst(for date: Date) -> String {
-        let symbols = ["M", "T", "W", "T", "F", "S", "S"]
-        let weekday = calendar.component(.weekday, from: date)
-        let monFirstIndex = (weekday + 5) % 7
-        return symbols[monFirstIndex]
+    func threeLetterWeekday(for date: Date) -> String {
+        let df = DateFormatter()
+        df.locale = Locale.current
+        df.dateFormat = "EEE"
+        return df.string(from: date)
     }
     
     func isSelected(_ day: DailyBPMRange) -> Bool {
@@ -563,12 +503,121 @@ private extension HistoryView {
         }
     }
     
+    // X scale domain used to center marks inside day bands
+    var chartXDomain: ClosedRange<Date> {
+        switch rangeMode {
+        case .weekly:
+            // Center rule marks within daily bands and leave extra room after the last boundary
+            let (start, end) = currentWeekRange
+            let left = calendar.date(byAdding: .hour, value: -12, to: start) ?? start
+            // extend a full day beyond Sunday
+            let rightPad = calendar.date(byAdding: .hour, value: 36, to: end) ?? end
+            return left...rightPad
+        case .monthly:
+            let (start, end) = currentMonthRange
+            let left = calendar.date(byAdding: .hour, value: -12, to: start) ?? start
+            // extend ~2 days beyond the last day to make the "last day" label clearly visible
+            let rightPad = calendar.date(byAdding: .hour, value: 60, to: end) ?? end
+            return left...rightPad
+        }
+    }
+    
+    // MARK: Chart view
+    @ViewBuilder
+    func chartView() -> some View {
+        let baseData: [DailyBPMRange] = (rangeMode == .weekly) ? dailyRangesForCurrentWeek : dailyRangesForCurrentMonth
+        let chartData: [DailyBPMRange] = baseData.filter { $0.min != 0 || $0.max != 0 }
+        
+        Chart(chartData) { day in
+            ChartBar(
+                day: day,
+                rangeMode: rangeMode,
+                isSelected: isSelected(day),
+                hasSelection: selectedDay != nil,
+                labelProvider: { dayLabel(for: day.day) }
+            )
+        }
+        .chartXScale(domain: chartXDomain)
+        .chartXAxis {
+            if rangeMode == .weekly {
+                weeklyXAxis()
+            } else {
+                monthlyXAxis()
+            }
+        }
+        .chartYAxis {
+            AxisMarks(position: .trailing)
+        }
+        .chartOverlay { proxy in
+            if rangeMode == .weekly {
+                GeometryReader { _ in
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .gesture(
+                            DragGesture(minimumDistance: 0)
+                                .onEnded { value in
+                                    guard let tappedDate: Date = proxy.value(atX: value.location.x) else { return }
+                                    let dayStart = calendar.startOfDay(for: tappedDate)
+                                    guard let dayData = dailyRangesForCurrentWeek.first(where: { calendar.isDate($0.day, inSameDayAs: dayStart) }) else { return }
+                                    guard let dayX: CGFloat = proxy.position(forX: dayData.day) else { return }
+                                    
+                                    let dx = abs(dayX - value.location.x)
+                                    let xHitSlop: CGFloat = 18
+                                    guard dx <= xHitSlop else { return }
+                                    
+                                    guard
+                                        let yMin: CGFloat = proxy.position(forY: Double(dayData.min)),
+                                        let yMax: CGFloat = proxy.position(forY: Double(dayData.max))
+                                    else { return }
+                                    let yLow = min(yMin, yMax)
+                                    let yHigh = max(yMin, yMax)
+                                    let yPadding: CGFloat = 14
+                                    let yHit = (value.location.y >= (yLow - yPadding)) && (value.location.y <= (yHigh + yPadding))
+                                    guard yHit else { return }
+                                    
+                                    toggleSelection(for: dayData.day)
+                                }
+                        )
+                }
+            }
+        }
+    }
+    
+    // Weekly axis: grid lines at day boundaries, labels at day centers (Mon..Sun)
+    @AxisContentBuilder
+    func weeklyXAxis() -> some AxisContent {
+        // Grid lines and ticks at boundaries
+        AxisMarks(values: weekBoundaryDays) { _ in
+            AxisGridLine()
+            AxisTick()
+            AxisValueLabel("") // no labels on boundaries
+        }
+        // Labels at day centers (Mon..Sun)
+        AxisMarks(values: weekDays) { value in
+            if let dateValue: Date = value.as(Date.self) {
+                AxisValueLabel(threeLetterWeekday(for: dateValue))
+            }
+        }
+    }
+    
+    // Monthly axis: only 1, 10, 20, last day — both grid and label
+    @AxisContentBuilder
+    func monthlyXAxis() -> some AxisContent {
+        AxisMarks(values: monthlyTickDays) { value in
+            AxisGridLine()
+            AxisTick()
+            if let dateValue: Date = value.as(Date.self) {
+                let d = calendar.component(.day, from: dateValue)
+                AxisValueLabel("\(d)")
+            }
+        }
+    }
+    
     @ViewBuilder
     func statPillLarge(title: String, value: Int) -> some View {
         VStack(spacing: 2) {
             Text(title.uppercased())
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
             Text("\(value) BPM")
                 .font(.subheadline.weight(.semibold))
         }
