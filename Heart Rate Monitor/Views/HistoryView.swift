@@ -550,33 +550,38 @@ private extension HistoryView {
         }
         .chartOverlay { proxy in
             if rangeMode == .weekly {
-                GeometryReader { _ in
+                // Use a tap gesture without making the whole overlay hit-testable
+                GeometryReader { geo in
                     Color.clear
-                        .contentShape(Rectangle())
-                        .gesture(
-                            DragGesture(minimumDistance: 0)
-                                .onEnded { value in
-                                    guard let tappedDate: Date = proxy.value(atX: value.location.x) else { return }
-                                    let dayStart = calendar.startOfDay(for: tappedDate)
-                                    guard let dayData = dailyRangesForCurrentWeek.first(where: { calendar.isDate($0.day, inSameDayAs: dayStart) }) else { return }
-                                    guard let dayX: CGFloat = proxy.position(forX: dayData.day) else { return }
-                                    
-                                    let dx = abs(dayX - value.location.x)
-                                    let xHitSlop: CGFloat = 18
-                                    guard dx <= xHitSlop else { return }
-                                    
-                                    guard
-                                        let yMin: CGFloat = proxy.position(forY: Double(dayData.min)),
-                                        let yMax: CGFloat = proxy.position(forY: Double(dayData.max))
-                                    else { return }
-                                    let yLow = min(yMin, yMax)
-                                    let yHigh = max(yMin, yMax)
-                                    let yPadding: CGFloat = 14
-                                    let yHit = (value.location.y >= (yLow - yPadding)) && (value.location.y <= (yHigh + yPadding))
-                                    guard yHit else { return }
-                                    
-                                    toggleSelection(for: dayData.day)
-                                }
+                        .allowsHitTesting(false) // default: pass-through
+                        .background(
+                            // A transparent layer that only reacts to taps; if the tap isn't near a bar, nothing happens and List scrolling wins.
+                            TapCatcher { location in
+                                // Convert to chart-space values
+                                guard let tappedDate: Date = proxy.value(atX: location.x) else { return }
+                                let dayStart = calendar.startOfDay(for: tappedDate)
+                                guard let dayData = dailyRangesForCurrentWeek.first(where: { calendar.isDate($0.day, inSameDayAs: dayStart) }) else { return }
+                                guard let dayX: CGFloat = proxy.position(forX: dayData.day) else { return }
+                                
+                                // X proximity to the rule mark
+                                let dx = abs(dayX - location.x)
+                                let xHitSlop: CGFloat = 18
+                                guard dx <= xHitSlop else { return }
+                                
+                                // Y within min–max band (with padding)
+                                guard
+                                    let yMin: CGFloat = proxy.position(forY: Double(dayData.min)),
+                                    let yMax: CGFloat = proxy.position(forY: Double(dayData.max))
+                                else { return }
+                                let yLow = min(yMin, yMax)
+                                let yHigh = max(yMin, yMax)
+                                let yPadding: CGFloat = 14
+                                let yHit = (location.y >= (yLow - yPadding)) && (location.y <= (yHigh + yPadding))
+                                guard yHit else { return }
+                                
+                                // Only when both x and y are within the hit area do we toggle selection
+                                toggleSelection(for: dayData.day)
+                            }
                         )
                 }
             }
@@ -652,3 +657,43 @@ private struct ChartBar: ChartContent {
         .accessibilityLabel(Text("\(labelProvider()): \(day.min)–\(day.max) BPM"))
     }
 }
+
+// MARK: - Tap catcher that doesn’t block scroll unless a valid tap occurs
+
+private struct TapCatcher: UIViewRepresentable {
+    var onTap: (CGPoint) -> Void
+    
+    func makeUIView(context: Context) -> PassThroughTapView {
+        let view = PassThroughTapView()
+        view.onTap = onTap
+        return view
+    }
+    
+    func updateUIView(_ uiView: PassThroughTapView, context: Context) {
+        uiView.onTap = onTap
+    }
+}
+
+private final class PassThroughTapView: UIView {
+    var onTap: ((CGPoint) -> Void)?
+    
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        backgroundColor = .clear
+        let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap(_:)))
+        addGestureRecognizer(tap)
+        // Important: don’t block other gestures like scroll
+        tap.cancelsTouchesInView = false
+        tap.delaysTouchesBegan = false
+        tap.delaysTouchesEnded = false
+        isUserInteractionEnabled = true
+    }
+    
+    required init?(coder: NSCoder) { fatalError() }
+    
+    @objc private func handleTap(_ gr: UITapGestureRecognizer) {
+        let point = gr.location(in: self)
+        onTap?(point)
+    }
+}
+
