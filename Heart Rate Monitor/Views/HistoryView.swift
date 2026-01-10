@@ -324,7 +324,7 @@ struct HistoryView: View {
                             ForEach(pagedLog) { entry in
                                 HStack(spacing: 12) {
                                     if isSelectionMode {
-                                        Image(systemName: selectedEntries.contains(entry.id) ? "checkmark.circle_fill" : "circle")
+                                        Image(systemName: selectedEntries.contains(entry.id) ? "checkmark.circle.fill" : "circle")
                                             .foregroundColor(selectedEntries.contains(entry.id) ? .accentColor : .gray)
                                     }
                                     
