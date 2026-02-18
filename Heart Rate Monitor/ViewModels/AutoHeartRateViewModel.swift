@@ -253,7 +253,11 @@ final class AutoHeartRateViewModel: NSObject, ObservableObject {
         canShowBPM = false
     }
 
+    // Called on the main thread (dispatched from captureOutput) so all
+    // property access is thread-safe with respect to reset() and @Published.
     private func handleSample(_ redMean: Double) {
+        guard phase == .measuring else { return }
+
         // 1) Smooth via EMA
         if ema == nil { ema = redMean }
         ema = 0.2 * redMean + 0.8 * (ema ?? redMean)
@@ -279,33 +283,30 @@ final class AutoHeartRateViewModel: NSObject, ObservableObject {
             if let last = lastPeakTS {
                 let dt = now - last
                 if dt >= minInt && dt <= maxInt {
-                    // Detected a valid beat
-                    DispatchQueue.main.async {
-                        // If measurement has started, record intervals to measurementIntervals
-                        if let start = self.measurementStartTime, now >= start {
-                            self.measurementIntervals.append(dt)
-                            // Update live BPM from measurement-only intervals (e.g., last 5)
-                            self.currentBPM = self.computeBPM(from: Array(self.measurementIntervals.suffix(5)))
-                        } else {
-                            // Calibration phase: count beats only, do not accumulate intervals for BPM
-                            self.calibrationBeats += 1
-                            
-                            // When calibration completes, start measurement cleanly
-                            if self.calibrationBeats >= self.calibrationBeatsRequired && self.measurementStartTime == nil {
-                                self.measurementStartTime = now
-                                // Reset any previous measurement data to ensure clean 12s capture
-                                self.measurementIntervals.removeAll()
-                                self.currentBPM = nil
-                                self.canShowBPM = false
-                                self.revealTimeElapsed = false
-                                
-                                // Start 12s measurement timer and 4s reveal gate from this moment
-                                self.startPhase(duration: self.measureDuration)
-                                self.scheduleBPMReveal(after: self.bpmRevealAfter)
-                            }
+                    // If measurement has started, record intervals to measurementIntervals
+                    if let start = measurementStartTime, now >= start {
+                        measurementIntervals.append(dt)
+                        // Update live BPM from measurement-only intervals (e.g., last 5)
+                        currentBPM = computeBPM(from: Array(measurementIntervals.suffix(5)))
+                    } else {
+                        // Calibration phase: count beats only, do not accumulate intervals for BPM
+                        calibrationBeats += 1
+
+                        // When calibration completes, start measurement cleanly
+                        if calibrationBeats >= calibrationBeatsRequired && measurementStartTime == nil {
+                            measurementStartTime = now
+                            // Reset any previous measurement data to ensure clean 12s capture
+                            measurementIntervals.removeAll()
+                            currentBPM = nil
+                            canShowBPM = false
+                            revealTimeElapsed = false
+
+                            // Start 12s measurement timer and 4s reveal gate from this moment
+                            startPhase(duration: measureDuration)
+                            scheduleBPMReveal(after: bpmRevealAfter)
                         }
-                        self.pulseHeart() // beat on every detected peak
                     }
+                    pulseHeart() // beat on every detected peak
                 }
             }
             lastPeakTS = now
@@ -322,20 +323,19 @@ final class AutoHeartRateViewModel: NSObject, ObservableObject {
     }
 
     private func pulseHeart() {
-        DispatchQueue.main.async {
-            withAnimation(.easeInOut(duration: 0.12)) { self.heartScale = 1.2 }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-                withAnimation(.easeInOut(duration: 0.12)) { self.heartScale = 1.0 }
-            }
+        withAnimation(.easeInOut(duration: 0.12)) { heartScale = 1.2 }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+            withAnimation(.easeInOut(duration: 0.12)) { self.heartScale = 1.0 }
         }
     }
 }
 
 // MARK: - Video frames → brightness
 extension AutoHeartRateViewModel: AVCaptureVideoDataOutputSampleBufferDelegate {
+    // Runs on `captureQueue`. Only pixel-buffer reading happens here.
+    // Signal processing is dispatched to the main thread to avoid data races.
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
 
-        guard phase == .measuring else { return }
         guard let px = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
 
         CVPixelBufferLockBaseAddress(px, .readOnly)
@@ -363,7 +363,11 @@ extension AutoHeartRateViewModel: AVCaptureVideoDataOutputSampleBufferDelegate {
         guard count > 0 else { return }
         let redMean = sum / Double(count)      // 0…255
 
-        // Process sample
-        handleSample(redMean)
+        // Dispatch signal processing to the main thread so all mutable state
+        // (ema, window, lastPeakTS, @Published properties, etc.) is accessed
+        // from a single thread — eliminating data races with reset().
+        DispatchQueue.main.async { [weak self] in
+            self?.handleSample(redMean)
+        }
     }
 }
