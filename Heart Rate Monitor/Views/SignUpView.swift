@@ -167,13 +167,4 @@ struct SignUpView: View {
     }
 }
 
-private extension View {
-    @ViewBuilder
-    func `if`<Content: View>(_ condition: Bool, @ViewBuilder then: (Self) -> Content) -> some View {
-        if condition {
-            then(self)
-        } else {
-            self
-        }
-    }
-}
+

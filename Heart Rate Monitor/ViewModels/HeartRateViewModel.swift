@@ -54,7 +54,7 @@ class HeartRateViewModel: ObservableObject {
     }
 
     func recordTap() {
-        guard phase == .measuring || phase == .preview else { return }
+        guard phase == .measuring else { return }
         let now = Date()
         
         // If this is the first tap in measuring, start the 12s measurement countdown
@@ -126,8 +126,6 @@ class HeartRateViewModel: ObservableObject {
             guard let self = self else { return }
             if self.phase == .measuring {
                 self.finishMeasuring()
-            } else if self.phase == .preview {
-                self.endSession()
             }
         }
     }

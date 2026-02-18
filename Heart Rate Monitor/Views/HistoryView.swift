@@ -411,9 +411,6 @@ struct HistoryView: View {
             }
             .navigationTitle("History")
         }
-        .onAppear {
-            seedSampleDataIfNeeded()
-        }
         .onChange(of: vm.log) { _, _ in
             visibleCount = min(max(5, visibleCount), filteredMeasurements.count)
             selectedEntries = selectedEntries.filter { id in vm.log.contains(where: { $0.id == id }) }

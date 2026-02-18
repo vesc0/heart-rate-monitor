@@ -14,7 +14,6 @@ struct ManualView: View {
     private var totalForCurrentPhase: Int {
         switch vm.phase {
         case .measuring: return 12
-        case .preview: return 10
         default: return 0
         }
     }
@@ -78,36 +77,6 @@ struct ManualView: View {
                             Button("Stop") { vm.stopSession() }
                                 .buttonStyle(.bordered)
                                 .tint(.red) // keep style, only color
-                        }
-                    }
-
-                case .preview:
-                    // Manual mode no longer uses preview; if reached, fallback to measuring UI
-                    VStack(spacing: 16) {
-                        Spacer()
-                        HeartTimerView(
-                            heartScale: vm.heartScale,
-                            secondsLeft: vm.secondsLeft,
-                            totalSeconds: totalForCurrentPhase,
-                            heartSize: 96,
-                            color: .red
-                        )
-                        .contentShape(Rectangle())
-                        .onTapGesture { vm.recordTap() }
-                        
-                        if let bpm = vm.currentBPM {
-                            Text("\(bpm) BPM")
-                                .font(.system(size: 42, weight: .bold))
-                        } else {
-                            Text("Keep tapping…")
-                                .foregroundColor(.gray)
-                        }
-                        Spacer()
-                        
-                        VStack(spacing: 20) {
-                            Button("Stop") { vm.stopSession() }
-                                .buttonStyle(.bordered)
-                                .tint(.red)
                         }
                     }
 

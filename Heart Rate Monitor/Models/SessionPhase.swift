@@ -8,6 +8,5 @@
 enum SessionPhase {
     case idle
     case measuring
-    case preview
     case finished
 }
