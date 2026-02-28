@@ -39,6 +39,14 @@ struct ContentView: View {
                 }
                 .tag(4)
         }
+        // Sync heart-rate data when auth state changes
+        .onChange(of: auth.isSignedIn) { _, isSignedIn in
+            if isSignedIn {
+                vm.refreshFromServer()
+            } else {
+                vm.clearForLogout()
+            }
+        }
     }
 }
 

@@ -132,8 +132,7 @@ struct AutoView: View {
             .onChange(of: autoVM.phase) { _, newPhase in
                 if newPhase == .finished, let bpm = autoVM.currentBPM {
                     let entry = HeartRateEntry(bpm: bpm, date: Date())
-                    vm.log.insert(entry, at: 0)
-                    vm.saveData()
+                    vm.addEntry(entry)
                 }
             }
             .navigationTitle(autoVM.phase == .idle ? "Measurement" : "")

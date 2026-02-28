@@ -19,7 +19,7 @@ class HeartRateViewModel: ObservableObject {
 
     // Taps & computation
     private var tapTimes: [Date] = []
-    /// Exposed read-only flag for the View
+    // Exposed read-only flag for the View
     var hasTapped: Bool {
         !tapTimes.isEmpty
     }
@@ -42,6 +42,7 @@ class HeartRateViewModel: ObservableObject {
 
     // Persistence
     private let saveKey = "HeartRateLog"
+    private let api = APIService.shared
 
     init() { loadData() }
 
@@ -91,8 +92,7 @@ class HeartRateViewModel: ObservableObject {
         // Only save if BPM is valid
         if let bpm = finalBPM {
             let entry = HeartRateEntry(bpm: bpm, date: Date())
-            log.insert(entry, at: 0)
-            saveData()
+            addEntry(entry)
         }
 
         phase = .finished
@@ -186,17 +186,96 @@ class HeartRateViewModel: ObservableObject {
         bpmRevealTimer?.invalidate(); bpmRevealTimer = nil
     }
 
-    // MARK: - Persistence
-    func saveData() {
+    // MARK: - Persistence (local cache + remote API)
+
+    // Insert a new entry locally and sync to the server.
+    func addEntry(_ entry: HeartRateEntry) {
+        log.insert(entry, at: 0)
+        saveLocal()
+        syncCreate(entry)
+    }
+
+    // Delete entries by their IDs (locally + remote).
+    func deleteEntries(ids: Set<UUID>) {
+        log.removeAll { ids.contains($0.id) }
+        saveLocal()
+        syncDelete(ids: ids)
+    }
+
+    // Persist the current log to UserDefaults (local cache only).
+    func saveLocal() {
         if let encoded = try? JSONEncoder().encode(log) {
             UserDefaults.standard.set(encoded, forKey: saveKey)
         }
     }
 
+    // Legacy alias kept for callers that only need a local write (e.g. demo seed).
+    func saveData() { saveLocal() }
+
+    // Clear all local data (used on sign-out to prevent data leakage between accounts).
+    func clearForLogout() {
+        log.removeAll()
+        UserDefaults.standard.removeObject(forKey: saveKey)
+    }
+
+    // Fetch entries from the API and replace the local cache.
+    func refreshFromServer() {
+        guard api.isAuthenticated else { return }
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                let remote = try await api.fetchHeartRateEntries()
+                // debug: fetched remote entries
+                self.log = remote.map {
+                    HeartRateEntry(
+                        bpm: $0.bpm,
+                        date: $0.recordedAt,
+                        id: UUID(uuidString: $0.id) ?? UUID()
+                    )
+                }
+                self.saveLocal()
+            } catch {
+                // Keep local data on error; server refresh is best-effort
+            }
+        }
+    }
+
     private func loadData() {
+        // Load cached data from UserDefaults first (instant)
         if let data = UserDefaults.standard.data(forKey: saveKey),
            let decoded = try? JSONDecoder().decode([HeartRateEntry].self, from: data) {
             log = decoded
+        }
+        // Then try to refresh from the server in the background
+        refreshFromServer()
+    }
+
+    // MARK: - Remote sync helpers (fire-and-forget)
+
+    private func syncCreate(_ entry: HeartRateEntry) {
+        guard api.isAuthenticated else { return }
+        Task {
+            do {
+                try await api.createHeartRateEntry(
+                    id: entry.id.uuidString,
+                    bpm: entry.bpm,
+                    recordedAt: entry.date
+                )
+            } catch {
+                // syncCreate failed; logged for debugging before, left silent now
+            }
+        }
+    }
+
+    private func syncDelete(ids: Set<UUID>) {
+        guard api.isAuthenticated else { return }
+        let idStrings = ids.map(\.uuidString)
+        Task {
+            do {
+                try await api.deleteHeartRateEntries(ids: idStrings)
+            } catch {
+                // syncDelete failed; previously logged for debugging
+            }
         }
     }
 }

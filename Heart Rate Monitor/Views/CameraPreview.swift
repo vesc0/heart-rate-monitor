@@ -21,7 +21,7 @@ struct CameraPreview: UIViewRepresentable {
     func updateUIView(_ uiView: PreviewView, context: Context) { }
 }
 
-/// A UIView backed by AVCaptureVideoPreviewLayer
+// A UIView backed by AVCaptureVideoPreviewLayer
 final class PreviewView: UIView {
     override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
     var videoPreviewLayer: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }

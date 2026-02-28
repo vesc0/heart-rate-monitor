@@ -4,13 +4,8 @@ struct ProfileView: View {
     @EnvironmentObject private var auth: AuthViewModel
     @State private var showAuthPopup = false
     @State private var selectedAuthTab = 0 // 0 = Login, 1 = Sign Up
-    
-    // Dummy profile info for demo/editing
-    @State private var name = "John Doe"
-    @State private var email: String = ""
-    @State private var age = "29"
-    @State private var healthIssues = "None"
     @State private var editingField: EditableField? = nil
+    @State private var profileError: String?
     
     enum EditableField: String, CaseIterable, Identifiable {
         case name, email, age, health
@@ -34,10 +29,10 @@ struct ProfileView: View {
                                     .padding(.horizontal, 6)
                                 
                                 VStack(spacing: 8) {
-                                    profileRow(label: "Name", value: name, editable: .name)
-                                    profileRow(label: "Email", value: auth.currentEmail ?? email, editable: .email)
-                                    profileRow(label: "Age", value: age, editable: .age)
-                                    profileRow(label: "Health Issues", value: healthIssues, editable: .health)
+                                    profileRow(label: "Name", value: auth.username ?? "", editable: .name)
+                                    profileRow(label: "Email", value: auth.currentEmail ?? "", editable: .email)
+                                    profileRow(label: "Age", value: auth.age ?? "", editable: .age)
+                                    profileRow(label: "Health Issues", value: auth.healthIssues ?? "", editable: .health)
                                 }
                                 .padding(12)
                                 .background(
@@ -70,6 +65,14 @@ struct ProfileView: View {
                             }
                             .buttonStyle(.plain)
                             .padding(.top, 4)
+                            
+                            if let err = profileError {
+                                Text(err)
+                                    .foregroundColor(.red)
+                                    .font(.footnote)
+                                    .multilineTextAlignment(.center)
+                                    .transition(.opacity)
+                            }
                         }
                         .padding(.horizontal)
                         .frame(maxWidth: 520)
@@ -173,15 +176,21 @@ struct ProfileView: View {
             .sheet(item: $editingField) { field in
                 EditFieldSheet(
                     field: field,
-                    value: binding(for: field),
-                    onDismiss: { editingField = nil }
+                    initialValue: currentValue(for: field),
+                    onSave: { newValue in
+                        saveProfileField(field, newValue: newValue)
+                        editingField = nil
+                    },
+                    onCancel: { editingField = nil }
                 )
             }
             .background(Color(.systemGroupedBackground))
             .animation(.easeInOut(duration: 0.18), value: showAuthPopup)
-            .onChange(of: auth.isSignedIn) { _, newVal in
-                if newVal { showAuthPopup = false }
-                if newVal { email = auth.currentEmail ?? "" }
+            .onChange(of: auth.isSignedIn) { _, isSignedIn in
+                if isSignedIn {
+                    showAuthPopup = false
+                    profileError = nil
+                }
             }
             .navigationTitle("Profile")
         }
@@ -220,9 +229,9 @@ struct ProfileView: View {
             .padding(.top, 8)
             
             VStack(spacing: 2) {
-                Text(name.isEmpty ? "Your Name" : name)
+                Text((auth.username ?? "").isEmpty ? "Your Name" : auth.username!)
                     .font(.title2).fontWeight(.bold)
-                Text(auth.currentEmail ?? email)
+                Text(auth.currentEmail ?? "")
                     .foregroundStyle(.secondary)
                     .font(.subheadline)
             }
@@ -300,13 +309,35 @@ struct ProfileView: View {
         )
     }
     
-    // MARK: - Binding for editing
-    func binding(for field: EditableField) -> Binding<String> {
+    // MARK: - Profile helpers
+
+    private func currentValue(for field: EditableField) -> String {
         switch field {
-        case .name: return $name
-        case .email: return $email
-        case .age: return $age
-        case .health: return $healthIssues
+        case .name:   return auth.username ?? ""
+        case .email:  return auth.currentEmail ?? ""
+        case .age:    return auth.age ?? ""
+        case .health: return auth.healthIssues ?? ""
+        }
+    }
+
+    private func saveProfileField(_ field: EditableField, newValue: String) {
+        guard auth.isSignedIn else { return }
+        Task {
+            do {
+                switch field {
+                case .name:
+                    try await auth.updateProfile(username: newValue)
+                case .email:
+                    try await auth.updateProfile(email: newValue)
+                case .age:
+                    try await auth.updateProfile(age: Int(newValue))
+                case .health:
+                    try await auth.updateProfile(healthIssues: newValue)
+                }
+                profileError = nil
+            } catch {
+                profileError = error.localizedDescription
+            }
         }
     }
 }
@@ -314,15 +345,17 @@ struct ProfileView: View {
 // Inline sheet for editing fields
 struct EditFieldSheet: View {
     let field: ProfileView.EditableField
-    @Binding var value: String
-    var onDismiss: () -> Void
-    
+    let initialValue: String
+    var onSave: (String) -> Void
+    var onCancel: () -> Void
+
+    @State private var draft: String = ""
     @FocusState private var textFocused: Bool
-    
+
     var body: some View {
         NavigationStack {
             Form {
-                TextField(fieldName, text: $value)
+                TextField(fieldName, text: $draft)
                     .focused($textFocused)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
@@ -331,17 +364,20 @@ struct EditFieldSheet: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
-                        onDismiss()
+                        onSave(draft)
                     }
                     .fontWeight(.bold)
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
-                        onDismiss()
+                        onCancel()
                     }
                 }
             }
-            .onAppear { textFocused = true }
+            .onAppear {
+                draft = initialValue
+                textFocused = true
+            }
         }
     }
     private var fieldName: String {

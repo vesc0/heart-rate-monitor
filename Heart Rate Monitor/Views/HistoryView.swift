@@ -351,9 +351,8 @@ struct HistoryView: View {
                             }
                             .onDelete { offsets in
                                 let sortedFiltered = filteredMeasurements.sorted { $0.date > $1.date }
-                                let toDelete = offsets.map { sortedFiltered[$0] }
-                                vm.log.removeAll { e in toDelete.contains(e) }
-                                vm.saveData()
+                                let toDelete = Set(offsets.map { sortedFiltered[$0].id })
+                                vm.deleteEntries(ids: toDelete)
                                 visibleCount = min(visibleCount, filteredMeasurements.count)
                             }
                             
@@ -389,8 +388,7 @@ struct HistoryView: View {
                                     .buttonStyle(.plain)
                                     
                                     Button("Delete") {
-                                        vm.log.removeAll { selectedEntries.contains($0.id) }
-                                        vm.saveData()
+                                        vm.deleteEntries(ids: selectedEntries)
                                         isSelectionMode = false
                                         selectedEntries.removeAll()
                                         visibleCount = min(visibleCount, filteredMeasurements.count)
