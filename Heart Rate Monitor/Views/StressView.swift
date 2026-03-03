@@ -1,0 +1,195 @@
+//
+//  StressView.swift
+//  Heart Rate Monitor
+//
+//  Created by Vesco on 3/1/26.
+//
+
+import SwiftUI
+
+struct StressView: View {
+    @ObservedObject var vm: HeartRateViewModel
+    @StateObject private var stressVM = StressViewModel()
+
+    private var totalForCurrentPhase: Int {
+        switch stressVM.phase {
+        case .measuring: return 60
+        default: return 0
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                // Camera preview during measurement
+                if stressVM.phase == .measuring {
+                    VStack(spacing: 0) {
+                        CameraPreview(session: stressVM.session)
+                            .frame(height: 160)
+                            .overlay(
+                                LinearGradient(
+                                    gradient: Gradient(colors: [.black.opacity(0.5), .clear]),
+                                    startPoint: .top, endPoint: .bottom
+                                )
+                            )
+                            .clipped()
+                        Spacer()
+                    }
+                    .ignoresSafeArea(edges: .top)
+                }
+
+                VStack(spacing: 16) {
+                    // MARK: Idle
+                    if stressVM.phase == .idle {
+                        VStack(spacing: 16) {
+                            Image(systemName: "brain.head.profile")
+                                .font(.system(size: 48))
+                                .foregroundStyle(.red.opacity(0.8))
+                                .padding(.bottom, 4)
+
+                            Text("Stress Measurement")
+                                .font(.title2)
+                                .fontWeight(.bold)
+
+                            Text("Place your fingertip over the camera and keep it still for 60 seconds. The app will analyse your heart-rate variability and predict whether you are stressed.")
+                                .multilineTextAlignment(.center)
+                                .foregroundColor(.secondary)
+                                .padding(.horizontal)
+
+                            Button {
+                                stressVM.startSession()
+                            } label: {
+                                Label("Start Stress Session", systemImage: "play.fill")
+                                    .fontWeight(.semibold)
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(.red, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                                    .foregroundColor(.white)
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.horizontal, 64)
+                            .padding(.top, 8)
+                        }
+                        .frame(maxHeight: .infinity, alignment: .center)
+
+                    // MARK: Measuring
+                    } else if stressVM.phase == .measuring {
+                        VStack(spacing: 16) {
+                            Spacer()
+
+                            HeartTimerView(
+                                heartScale: stressVM.heartScale,
+                                secondsLeft: stressVM.secondsLeft,
+                                totalSeconds: totalForCurrentPhase,
+                                heartSize: 96,
+                                color: .purple
+                            )
+
+                            if stressVM.canShowBPM, let bpm = stressVM.currentBPM {
+                                Text("\(bpm) BPM")
+                                    .font(.system(size: 42, weight: .bold))
+                            } else {
+                                Text("Calibrating… keep fingertip on camera")
+                                    .foregroundColor(.secondary)
+                            }
+
+                            Spacer()
+                        }
+
+                    // MARK: Finished
+                    } else if stressVM.phase == .finished {
+                        VStack(spacing: 20) {
+                            if let bpm = stressVM.currentBPM {
+                                Text("Heart Rate: \(bpm) BPM")
+                                    .font(.title3)
+                                    .foregroundColor(.secondary)
+                            }
+
+                            if stressVM.isPredicting {
+                                ProgressView("Analysing…")
+                            } else if let result = stressVM.stressResult {
+                                Image(systemName: result.isStressed
+                                      ? "exclamationmark.triangle.fill"
+                                      : "checkmark.seal.fill")
+                                    .font(.system(size: 56))
+                                    .foregroundColor(result.isStressed ? .red : .green)
+
+                                Text(result.stressLevel)
+                                    .font(.title)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(result.isStressed ? .red : .green)
+                            }
+
+                            Button {
+                                stressVM.phase = .idle
+                            } label: {
+                                Text("Done")
+                                    .fontWeight(.semibold)
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(.red, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                                    .foregroundColor(.white)
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.horizontal, 64)
+                        }
+                        .frame(maxHeight: .infinity, alignment: .center)
+                    }
+
+                    if let err = stressVM.errorMessage {
+                        Text(err)
+                            .foregroundColor(.red)
+                            .multilineTextAlignment(.center)
+                    }
+
+                    Spacer()
+
+                    // Stop button
+                    Group {
+                        if stressVM.phase == .measuring {
+                            Button(role: .destructive) {
+                                stressVM.stopSessionEarly()
+                            } label: {
+                                Text("Stop")
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(.red)
+                        }
+                    }
+                    .padding(.bottom, 20)
+                }
+            }
+            // Save entry when finished
+            .onChange(of: stressVM.phase) { _, newPhase in
+                if newPhase == .finished, let bpm = stressVM.currentBPM {
+                    let stress = stressVM.stressResult?.stressLevel
+                    let entry = HeartRateEntry(bpm: bpm, date: Date(), stressLevel: stress)
+                    vm.addEntry(entry)
+                }
+            }
+            // Also save once prediction arrives (stress may arrive after phase change)
+            .onChange(of: stressVM.stressResult?.stressLevel) { oldVal, newVal in
+                if let level = newVal,
+                   oldVal == nil,
+                   stressVM.phase == .finished,
+                   let bpm = stressVM.currentBPM {
+                    // Update the last entry with the stress level
+                    if let idx = vm.log.firstIndex(where: {
+                        $0.bpm == bpm && $0.stressLevel == nil
+                    }) {
+                        let old = vm.log[idx]
+                        let updated = HeartRateEntry(
+                            bpm: old.bpm,
+                            date: old.date,
+                            id: old.id,
+                            stressLevel: level
+                        )
+                        vm.log[idx] = updated
+                        vm.saveLocal()
+                    }
+                }
+            }
+            .navigationTitle(stressVM.phase == .idle ? "Stress" : "")
+        }
+    }
+}

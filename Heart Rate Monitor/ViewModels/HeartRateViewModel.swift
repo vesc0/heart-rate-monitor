@@ -230,7 +230,8 @@ class HeartRateViewModel: ObservableObject {
                     HeartRateEntry(
                         bpm: $0.bpm,
                         date: $0.recordedAt,
-                        id: UUID(uuidString: $0.id) ?? UUID()
+                        id: UUID(uuidString: $0.id) ?? UUID(),
+                        stressLevel: $0.stressLevel
                     )
                 }
                 self.saveLocal()
@@ -259,7 +260,8 @@ class HeartRateViewModel: ObservableObject {
                 try await api.createHeartRateEntry(
                     id: entry.id.uuidString,
                     bpm: entry.bpm,
-                    recordedAt: entry.date
+                    recordedAt: entry.date,
+                    stressLevel: entry.stressLevel
                 )
             } catch {
                 // syncCreate failed; logged for debugging before, left silent now

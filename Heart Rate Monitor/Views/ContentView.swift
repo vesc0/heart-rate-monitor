@@ -10,28 +10,28 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var vm = HeartRateViewModel()
     @StateObject private var auth = AuthViewModel()
-    @State private var selectedTab = 2
+    @State private var selectedTab = 1
     
     var body: some View {
         TabView(selection: $selectedTab) {
-            ManualView(vm: vm)
+            MeasurementView(vm: vm)
                 .tabItem {
-                    Label("Manual", systemImage: "hand.tap")
+                    Label("Measure", systemImage: "heart.fill")
                 }
                 .tag(1)
 
-            AutoView(vm: vm)
+            StressView(vm: vm)
                 .tabItem {
-                    Label("Automatic", systemImage: "camera")
+                    Label("Stress", systemImage: "brain.head.profile")
                 }
                 .tag(2)
-            
+
             HistoryView(vm: vm)
                 .tabItem {
                     Label("History", systemImage: "list.bullet")
                 }
                 .tag(3)
-            
+
             ProfileView()
                 .environmentObject(auth)
                 .tabItem {

@@ -328,8 +328,16 @@ struct HistoryView: View {
                                             .foregroundColor(selectedEntries.contains(entry.id) ? .accentColor : .gray)
                                     }
                                     
-                                    Text("\(entry.bpm) BPM")
-                                        .fontWeight(.semibold)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("\(entry.bpm) BPM")
+                                            .fontWeight(.semibold)
+                                        if let stress = entry.stressLevel {
+                                            Text(stress)
+                                                .font(.caption)
+                                                .fontWeight(.medium)
+                                                .foregroundColor(stress == "Stressed" ? .red : .green)
+                                        }
+                                    }
                                     Spacer(minLength: 8)
                                     VStack(alignment: .trailing, spacing: 2) {
                                         Text(entry.date, format: .dateTime.month(.abbreviated).day().year())
@@ -574,7 +582,7 @@ private extension HistoryView {
                                 let yHit = (location.y >= (yLow - yPadding)) && (location.y <= (yHigh + yPadding))
                                 guard yHit else { return }
                                 
-                                // Only when both x and y are within the hit area do we toggle selection
+                                // Only when both x and y are within the hit area toggle selection
                                 toggleSelection(for: dayData.day)
                             }
                         )

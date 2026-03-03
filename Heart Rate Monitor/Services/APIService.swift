@@ -73,11 +73,56 @@ struct HeartRateEntryResponse: Codable, Identifiable {
     let bpm: Int
     let recordedAt: Date
     let createdAt: Date
+    let stressLevel: String?
 
     enum CodingKeys: String, CodingKey {
         case id, bpm
         case recordedAt = "recorded_at"
         case createdAt  = "created_at"
+        case stressLevel = "stress_level"
+    }
+}
+
+// MARK: - Stress prediction types
+
+struct StressPredictRequest: Encodable {
+    let meanRR: Double
+    let sdnn: Double
+    let medianRR: Double
+    let cvRR: Double
+    let rmssd: Double
+    let sdsd: Double
+    let pnn50: Double
+    let pnn20: Double
+    let meanHR: Double
+    let stdHR: Double
+    let minHR: Double
+    let maxHR: Double
+    let hrRange: Double
+    let numBeats: Double
+
+    enum CodingKeys: String, CodingKey {
+        case meanRR = "mean_rr"
+        case sdnn
+        case medianRR = "median_rr"
+        case cvRR = "cv_rr"
+        case rmssd, sdsd, pnn50, pnn20
+        case meanHR = "mean_hr"
+        case stdHR = "std_hr"
+        case minHR = "min_hr"
+        case maxHR = "max_hr"
+        case hrRange = "hr_range"
+        case numBeats = "num_beats"
+    }
+}
+
+struct StressPredictResponse: Codable {
+    let isStressed: Bool
+    let stressLevel: String
+
+    enum CodingKeys: String, CodingKey {
+        case isStressed = "is_stressed"
+        case stressLevel = "stress_level"
     }
 }
 
@@ -94,7 +139,7 @@ final class APIService {
     #if targetEnvironment(simulator)
     private let baseURL = "http://127.0.0.1:8000"
     #else
-    private let baseURL = "http://172.20.10.4:8000"
+    private let baseURL = "http://127.0.0.1:8000"
     #endif
 
     private let session: URLSession
@@ -214,13 +259,15 @@ final class APIService {
     func createHeartRateEntry(
         id: String? = nil,
         bpm: Int,
-        recordedAt: Date
+        recordedAt: Date,
+        stressLevel: String? = nil
     ) async throws -> HeartRateEntryResponse {
         let isoFormatter = ISO8601DateFormatter()
         isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let isoDate = isoFormatter.string(from: recordedAt)
         var body: [String: Any] = ["bpm": bpm, "recorded_at": isoDate]
         if let id { body["id"] = id }
+        if let stressLevel { body["stress_level"] = stressLevel }
         return try await request(.post, path: "/heart-rate", body: body, authenticated: true)
     }
 
@@ -245,6 +292,14 @@ final class APIService {
         let _: [String: Int] = try await request(
             .post, path: "/heart-rate/batch-delete", body: body, authenticated: true
         )
+    }
+
+    // MARK: - Stress prediction
+
+    func predictStress(features: StressPredictRequest) async throws -> StressPredictResponse {
+        let bodyData = try JSONEncoder().encode(features)
+        let bodyDict = try JSONSerialization.jsonObject(with: bodyData) as? [String: Any] ?? [:]
+        return try await request(.post, path: "/stress-predict", body: bodyDict, authenticated: true)
     }
 
     // MARK: - Internals
