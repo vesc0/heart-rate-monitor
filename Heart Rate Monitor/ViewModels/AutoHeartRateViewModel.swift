@@ -178,8 +178,22 @@ final class AutoHeartRateViewModel: NSObject, ObservableObject {
         session.beginConfiguration()
         session.sessionPreset = .low  // only luminosity is needed, keep it light
 
-        // Back camera
-        guard let cam = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
+        // Try cameras in order: ultrawide - telephoto - main (closest to flash first)
+        let cameraTypes: [AVCaptureDevice.DeviceType] = [
+            .builtInUltraWideCamera,
+            .builtInTelephotoCamera,
+            .builtInWideAngleCamera
+        ]
+        
+        var cam: AVCaptureDevice?
+        for deviceType in cameraTypes {
+            if let device = AVCaptureDevice.default(deviceType, for: .video, position: .back) {
+                cam = device
+                break
+            }
+        }
+        
+        guard let cam = cam,
               let input = try? AVCaptureDeviceInput(device: cam),
               session.canAddInput(input) else {
             errorMessage = "No back camera available."
