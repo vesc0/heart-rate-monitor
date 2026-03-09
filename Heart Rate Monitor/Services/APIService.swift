@@ -41,12 +41,17 @@ struct AuthTokenResponse: Codable {
     let username: String?
     let email: String?
     let age: Int?
+    let gender: String?
+    let heightCm: Int?
+    let weightKg: Int?
     let healthIssues: String?
 
     enum CodingKeys: String, CodingKey {
         case accessToken = "access_token"
         case tokenType   = "token_type"
-        case username, email, age
+        case username, email, age, gender
+        case heightCm = "height_cm"
+        case weightKg = "weight_kg"
         case healthIssues = "health_issues"
     }
 }
@@ -60,10 +65,15 @@ struct UserProfileResponse: Codable {
     let username: String
     let email: String
     let age: Int?
+    let gender: String?
+    let heightCm: Int?
+    let weightKg: Int?
     let healthIssues: String?
 
     enum CodingKeys: String, CodingKey {
-        case username, email, age
+        case username, email, age, gender
+        case heightCm = "height_cm"
+        case weightKg = "weight_kg"
         case healthIssues = "health_issues"
     }
 }
@@ -86,12 +96,11 @@ struct HeartRateEntryResponse: Codable, Identifiable {
 // MARK: - Stress prediction types
 
 struct StressPredictRequest: Encodable {
-    let meanRR: Double
+    // Time-domain HRV
     let sdnn: Double
     let medianRR: Double
     let cvRR: Double
     let rmssd: Double
-    let sdsd: Double
     let pnn50: Double
     let pnn20: Double
     let meanHR: Double
@@ -99,30 +108,53 @@ struct StressPredictRequest: Encodable {
     let minHR: Double
     let maxHR: Double
     let hrRange: Double
-    let numBeats: Double
+    // Frequency-domain HRV
+    let lfPower: Double
+    let hfPower: Double
+    let lfHfRatio: Double
+    let totalPower: Double
+    let lfNorm: Double
+    // Nonlinear HRV
+    let sd1: Double
+    let sd2: Double
+    let sdRatio: Double
+    // Demographics (optional)
+    let age: Double?
+    let genderMale: Double?
+    let heightCm: Double?
+    let weightKg: Double?
 
     enum CodingKeys: String, CodingKey {
-        case meanRR = "mean_rr"
         case sdnn
         case medianRR = "median_rr"
         case cvRR = "cv_rr"
-        case rmssd, sdsd, pnn50, pnn20
+        case rmssd, pnn50, pnn20
         case meanHR = "mean_hr"
         case stdHR = "std_hr"
         case minHR = "min_hr"
         case maxHR = "max_hr"
         case hrRange = "hr_range"
-        case numBeats = "num_beats"
+        case lfPower = "lf_power"
+        case hfPower = "hf_power"
+        case lfHfRatio = "lf_hf_ratio"
+        case totalPower = "total_power"
+        case lfNorm = "lf_norm"
+        case sd1, sd2
+        case sdRatio = "sd_ratio"
+        case age
+        case genderMale = "gender_male"
+        case heightCm = "height_cm"
+        case weightKg = "weight_kg"
     }
 }
 
 struct StressPredictResponse: Codable {
+    let stressLevelPct: Double
     let isStressed: Bool
-    let stressLevel: String
 
     enum CodingKeys: String, CodingKey {
+        case stressLevelPct = "stress_level_pct"
         case isStressed = "is_stressed"
-        case stressLevel = "stress_level"
     }
 }
 
@@ -137,9 +169,9 @@ final class APIService {
     static let shared = APIService()
 
     #if targetEnvironment(simulator)
-    private let baseURL = "http://127.0.0.1:8000"
+    private let baseURL = "http://172.20.10.4:8000"
     #else
-    private let baseURL = "http://127.0.0.1:8000"
+    private let baseURL = "http://172.20.10.4:8000"
     #endif
 
     private let session: URLSession
@@ -243,12 +275,18 @@ final class APIService {
         username: String? = nil,
         email: String? = nil,
         age: Int? = nil,
+        gender: String? = nil,
+        heightCm: Int? = nil,
+        weightKg: Int? = nil,
         healthIssues: String? = nil
     ) async throws -> UserProfileResponse {
         var body: [String: Any] = [:]
         if let username { body["username"] = username }
         if let email { body["email"] = email }
         if let age { body["age"] = age }
+        if let gender { body["gender"] = gender }
+        if let heightCm { body["height_cm"] = heightCm }
+        if let weightKg { body["weight_kg"] = weightKg }
         if let healthIssues { body["health_issues"] = healthIssues }
         return try await request(.put, path: "/me", body: body, authenticated: true)
     }

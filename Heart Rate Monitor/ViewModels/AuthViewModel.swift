@@ -10,6 +10,9 @@ final class AuthViewModel: ObservableObject {
     @Published var currentEmail: String?
     @Published var username: String?
     @Published var age: String?
+    @Published var gender: String?
+    @Published var heightCm: String?
+    @Published var weightKg: String?
     @Published var healthIssues: String?
 
     // MARK: - Private
@@ -19,6 +22,9 @@ final class AuthViewModel: ObservableObject {
     private let emailKey        = "auth.email"
     private let usernameKey     = "auth.username"
     private let ageKey          = "auth.age"
+    private let genderKey       = "auth.gender"
+    private let heightCmKey     = "auth.heightCm"
+    private let weightKgKey     = "auth.weightKg"
     private let healthIssuesKey = "auth.healthIssues"
 
     private var tokenObserver: NSObjectProtocol?
@@ -33,11 +39,17 @@ final class AuthViewModel: ObservableObject {
             self.currentEmail  = UserDefaults.standard.string(forKey: emailKey)
             self.username      = UserDefaults.standard.string(forKey: usernameKey)
             self.age           = UserDefaults.standard.string(forKey: ageKey)
+            self.gender        = UserDefaults.standard.string(forKey: genderKey)
+            self.heightCm      = UserDefaults.standard.string(forKey: heightCmKey)
+            self.weightKg      = UserDefaults.standard.string(forKey: weightKgKey)
             self.healthIssues  = UserDefaults.standard.string(forKey: healthIssuesKey)
         } else {
             self.currentEmail = nil
             self.username     = nil
             self.age          = nil
+            self.gender       = nil
+            self.heightCm     = nil
+            self.weightKg     = nil
             self.healthIssues = nil
         }
 
@@ -93,6 +105,9 @@ final class AuthViewModel: ObservableObject {
         currentEmail = nil
         username     = nil
         age          = nil
+        gender       = nil
+        heightCm     = nil
+        weightKg     = nil
         healthIssues = nil
         clearPersistedProfile()
     }
@@ -107,19 +122,23 @@ final class AuthViewModel: ObservableObject {
             username     = profile.username
             currentEmail = profile.email
             age          = profile.age.map { String($0) }
+            gender       = profile.gender
+            heightCm     = profile.heightCm.map { String($0) }
+            weightKg     = profile.weightKg.map { String($0) }
             healthIssues = profile.healthIssues
             persistProfile()
         } catch {
-            // Keep cached data on error — server refresh is best-effort.
             print("[AuthVM] fetchProfile failed: \(error)")
         }
     }
 
-    // Push a profile update to the server. Only non-nil fields are sent.
     func updateProfile(
         username: String? = nil,
         email: String? = nil,
         age: Int? = nil,
+        gender: String? = nil,
+        heightCm: Int? = nil,
+        weightKg: Int? = nil,
         healthIssues: String? = nil
     ) async throws {
         guard api.isAuthenticated else { return }
@@ -128,11 +147,17 @@ final class AuthViewModel: ObservableObject {
                 username: username,
                 email: email,
                 age: age,
+                gender: gender,
+                heightCm: heightCm,
+                weightKg: weightKg,
                 healthIssues: healthIssues
             )
             self.username     = updated.username
             self.currentEmail = updated.email
             self.age          = updated.age.map { String($0) }
+            self.gender       = updated.gender
+            self.heightCm     = updated.heightCm.map { String($0) }
+            self.weightKg     = updated.weightKg.map { String($0) }
             self.healthIssues = updated.healthIssues
             persistProfile()
         } catch let error as APIError {
@@ -146,6 +171,9 @@ final class AuthViewModel: ObservableObject {
         currentEmail = response.email ?? fallbackEmail
         username     = response.username
         age          = response.age.map { String($0) }
+        gender       = response.gender
+        heightCm     = response.heightCm.map { String($0) }
+        weightKg     = response.weightKg.map { String($0) }
         healthIssues = response.healthIssues
         isSignedIn   = true
         persistProfile()
@@ -156,12 +184,15 @@ final class AuthViewModel: ObservableObject {
         ud.set(currentEmail, forKey: emailKey)
         ud.set(username,     forKey: usernameKey)
         ud.set(age,          forKey: ageKey)
+        ud.set(gender,       forKey: genderKey)
+        ud.set(heightCm,     forKey: heightCmKey)
+        ud.set(weightKg,     forKey: weightKgKey)
         ud.set(healthIssues, forKey: healthIssuesKey)
     }
 
     private func clearPersistedProfile() {
         let ud = UserDefaults.standard
-        for key in [emailKey, usernameKey, ageKey, healthIssuesKey] {
+        for key in [emailKey, usernameKey, ageKey, genderKey, heightCmKey, weightKgKey, healthIssuesKey] {
             ud.removeObject(forKey: key)
         }
     }

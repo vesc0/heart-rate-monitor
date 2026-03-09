@@ -9,6 +9,7 @@ import SwiftUI
 
 struct StressView: View {
     @ObservedObject var vm: HeartRateViewModel
+    @EnvironmentObject private var auth: AuthViewModel
     @StateObject private var stressVM = StressViewModel()
 
     private var totalForCurrentPhase: Int {
@@ -57,6 +58,11 @@ struct StressView: View {
                                 .padding(.horizontal)
 
                             Button {
+                                // Inject demographics from user profile
+                                stressVM.userAge = auth.age.flatMap { Int($0) }
+                                stressVM.userGender = auth.gender
+                                stressVM.userHeightCm = auth.heightCm.flatMap { Int($0) }
+                                stressVM.userWeightKg = auth.weightKg.flatMap { Int($0) }
                                 stressVM.startSession()
                             } label: {
                                 Label("Start Stress Session", systemImage: "play.fill")
@@ -108,16 +114,21 @@ struct StressView: View {
                             if stressVM.isPredicting {
                                 ProgressView("Analysing…")
                             } else if let result = stressVM.stressResult {
-                                Image(systemName: result.isStressed
-                                      ? "exclamationmark.triangle.fill"
-                                      : "checkmark.seal.fill")
-                                    .font(.system(size: 56))
-                                    .foregroundColor(result.isStressed ? .red : .green)
+                                let pct = result.stressLevelPct
+                                let color: Color = pct >= 70 ? .red : pct >= 40 ? .orange : .green
+                                let icon = pct >= 50 ? "exclamationmark.triangle.fill" : "checkmark.seal.fill"
 
-                                Text(result.stressLevel)
-                                    .font(.title)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(result.isStressed ? .red : .green)
+                                Image(systemName: icon)
+                                    .font(.system(size: 56))
+                                    .foregroundColor(color)
+
+                                Text(String(format: "%.0f%%", pct))
+                                    .font(.system(size: 48, weight: .bold))
+                                    .foregroundColor(color)
+
+                                Text(pct >= 70 ? "High Stress" : pct >= 40 ? "Moderate Stress" : "Low Stress")
+                                    .font(.title3)
+                                    .foregroundColor(color)
                             }
 
                             Button {
@@ -162,18 +173,18 @@ struct StressView: View {
             // Save entry when finished
             .onChange(of: stressVM.phase) { _, newPhase in
                 if newPhase == .finished, let bpm = stressVM.currentBPM {
-                    let stress = stressVM.stressResult?.stressLevel
+                    let stress = stressVM.stressResult.map { String(format: "%.0f%%", $0.stressLevelPct) }
                     let entry = HeartRateEntry(bpm: bpm, date: Date(), stressLevel: stress)
                     vm.addEntry(entry)
                 }
             }
             // Also save once prediction arrives (stress may arrive after phase change)
-            .onChange(of: stressVM.stressResult?.stressLevel) { oldVal, newVal in
-                if let level = newVal,
+            .onChange(of: stressVM.stressResult?.stressLevelPct) { oldVal, newVal in
+                if let pct = newVal,
                    oldVal == nil,
                    stressVM.phase == .finished,
                    let bpm = stressVM.currentBPM {
-                    // Update the last entry with the stress level
+                    let level = String(format: "%.0f%%", pct)
                     if let idx = vm.log.firstIndex(where: {
                         $0.bpm == bpm && $0.stressLevel == nil
                     }) {

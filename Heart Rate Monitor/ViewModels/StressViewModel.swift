@@ -23,6 +23,12 @@ final class StressViewModel: NSObject, ObservableObject {
     // Result populated after the API responds.
     @Published var stressResult: StressPredictResponse?
 
+    // Demographics from user profile (set by the view before starting).
+    var userAge: Int?
+    var userGender: String?
+    var userHeightCm: Int?
+    var userWeightKg: Int?
+
     // True while waiting for the server prediction.
     @Published var isPredicting: Bool = false
 
@@ -149,12 +155,6 @@ final class StressViewModel: NSObject, ObservableObject {
             let sumSq = diffs.reduce(0.0) { $0 + $1 * $1 }
             return sqrt(sumSq / Double(diffs.count))
         }()
-        let sdsd: Double = {
-            guard diffs.count > 1 else { return 0 }
-            let meanD = diffs.reduce(0, +) / Double(diffs.count)
-            let varD = diffs.reduce(0.0) { $0 + pow($1 - meanD, 2) } / Double(diffs.count - 1)
-            return sqrt(varD)
-        }()
         let pnn50: Double = {
             guard !diffs.isEmpty else { return 0 }
             let count = diffs.filter { abs($0) > 50 }.count
@@ -179,21 +179,107 @@ final class StressViewModel: NSObject, ObservableObject {
             return sqrt(v)
         }()
 
+        // Frequency-domain HRV (Lomb-Scargle approximation via simple PSD)
+        var lfPower = 0.0, hfPower = 0.0, lfHfRatio = 0.0
+        var totalPower = 0.0, lfNorm = 0.0
+
+        if rr.count >= 20 {
+            let rrSec = rr.map { $0 / 1000.0 }
+            var tRR = [Double]()
+            var cumulative = 0.0
+            for r in rrSec {
+                cumulative += r
+                tRR.append(cumulative)
+            }
+            // Subtract first to start at 0
+            let t0 = tRR[0]
+            tRR = tRR.map { $0 - t0 }
+
+            // Interpolate to uniform 4 Hz
+            let fs = 4.0
+            let tMax = tRR.last ?? 0
+            let nSamples = Int(tMax * fs)
+            if nSamples > 10 {
+                var uniform = [Double]()
+                for i in 0..<nSamples {
+                    let t = Double(i) / fs
+                    // Linear interpolation
+                    var idx = 0
+                    while idx < tRR.count - 1 && tRR[idx + 1] < t { idx += 1 }
+                    if idx >= tRR.count - 1 {
+                        uniform.append(rr.last ?? meanRR)
+                    } else {
+                        let frac = (t - tRR[idx]) / max(tRR[idx + 1] - tRR[idx], 1e-9)
+                        uniform.append(rr[idx] + frac * (rr[min(idx + 1, rr.count - 1)] - rr[idx]))
+                    }
+                }
+                // Detrend
+                let uMean = uniform.reduce(0, +) / Double(uniform.count)
+                let detrended = uniform.map { $0 - uMean }
+
+                // Simple DFT power spectrum (enough for LF/HF bands)
+                let N = detrended.count
+                let freqRes = fs / Double(N)
+                var psd = [Double](repeating: 0, count: N / 2 + 1)
+                for k in 0...N/2 {
+                    var realPart = 0.0, imagPart = 0.0
+                    for ni in 0..<N {
+                        let angle = -2.0 * .pi * Double(k) * Double(ni) / Double(N)
+                        realPart += detrended[ni] * cos(angle)
+                        imagPart += detrended[ni] * sin(angle)
+                    }
+                    psd[k] = (realPart * realPart + imagPart * imagPart) / (fs * Double(N))
+                }
+
+                // Integrate LF (0.04–0.15 Hz) and HF (0.15–0.40 Hz)
+                for k in 0..<psd.count {
+                    let freq = Double(k) * freqRes
+                    if freq >= 0.04 && freq < 0.15 { lfPower += psd[k] * freqRes }
+                    if freq >= 0.15 && freq < 0.40 { hfPower += psd[k] * freqRes }
+                }
+                totalPower = lfPower + hfPower
+                lfHfRatio = hfPower > 0 ? lfPower / hfPower : 0
+                lfNorm = totalPower > 0 ? lfPower / totalPower * 100 : 0
+            }
+        }
+
+        // Nonlinear: Poincaré SD1, SD2
+        // SD1 = SDSD/√2 ≈ RMSSD/√2 (SDSD ≈ RMSSD for large N)
+        let sd1: Double = diffs.count > 1 ? rmssd / sqrt(2.0) : 0
+        let sd2Sq = 2.0 * sdnn * sdnn - sd1 * sd1
+        let sd2: Double = sd2Sq > 0 ? sqrt(sd2Sq) : 0
+        let sdRatio: Double = sd1 > 0 ? sd2 / sd1 : 0
+
+        // Demographics (optional)
+        let age: Double? = userAge.map { Double($0) }
+        let genderMale: Double? = userGender.map { $0 == "male" ? 1.0 : 0.0 }
+        let heightCm: Double? = userHeightCm.map { Double($0) }
+        let weightKg: Double? = userWeightKg.map { Double($0) }
+
         return StressPredictRequest(
-            meanRR:   meanRR,
-            sdnn:     sdnn,
-            medianRR: medianRR,
-            cvRR:     cvRR,
-            rmssd:    rmssd,
-            sdsd:     sdsd,
-            pnn50:    pnn50,
-            pnn20:    pnn20,
-            meanHR:   meanHR,
-            stdHR:    stdHR,
-            minHR:    minHR,
-            maxHR:    maxHR,
-            hrRange:  hrRange,
-            numBeats: Double(rr.count)
+            sdnn:       sdnn,
+            medianRR:   medianRR,
+            cvRR:       cvRR,
+            rmssd:      rmssd,
+            pnn50:      pnn50,
+            pnn20:      pnn20,
+            meanHR:     meanHR,
+            stdHR:      stdHR,
+            minHR:      minHR,
+            maxHR:      maxHR,
+            hrRange:    hrRange,
+            lfPower:    lfPower,
+            hfPower:    hfPower,
+            lfHfRatio:  lfHfRatio,
+            totalPower: totalPower,
+            lfNorm:     lfNorm,
+            sd1:        sd1,
+            sd2:        sd2,
+            sdRatio:    sdRatio,
+            age:        age,
+            genderMale: genderMale,
+            heightCm:   heightCm,
+            weightKg:   weightKg
         )
     }
 

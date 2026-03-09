@@ -33,12 +33,12 @@ struct ContentView: View {
                 .tag(3)
 
             ProfileView()
-                .environmentObject(auth)
                 .tabItem {
                     Label("Profile", systemImage: "person.crop.circle")
                 }
                 .tag(4)
         }
+        .environmentObject(auth)
         // Sync heart-rate data when auth state changes
         .onChange(of: auth.isSignedIn) { _, isSignedIn in
             if isSignedIn {

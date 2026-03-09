@@ -8,7 +8,7 @@ struct ProfileView: View {
     @State private var profileError: String?
 
     enum EditableField: String, CaseIterable, Identifiable {
-        case name, email, age, health
+        case name, email, age, gender, height, weight, health
         var id: String { rawValue }
     }
 
@@ -118,6 +118,12 @@ struct ProfileView: View {
                     profileRow(icon: "envelope.fill", label: "Email", value: auth.currentEmail ?? "", editable: .email)
                     Divider().padding(.leading, 48)
                     profileRow(icon: "calendar", label: "Age", value: auth.age ?? "", editable: .age)
+                    Divider().padding(.leading, 48)
+                    profileRow(icon: "figure.stand", label: "Gender", value: auth.gender ?? "", editable: .gender)
+                    Divider().padding(.leading, 48)
+                    profileRow(icon: "ruler", label: "Height (cm)", value: auth.heightCm ?? "", editable: .height)
+                    Divider().padding(.leading, 48)
+                    profileRow(icon: "scalemass", label: "Weight (kg)", value: auth.weightKg ?? "", editable: .weight)
                     Divider().padding(.leading, 48)
                     profileRow(icon: "heart.text.clipboard", label: "Health", value: auth.healthIssues ?? "", editable: .health)
                 }
@@ -244,6 +250,9 @@ struct ProfileView: View {
         case .name:   return auth.username ?? ""
         case .email:  return auth.currentEmail ?? ""
         case .age:    return auth.age ?? ""
+        case .gender: return auth.gender ?? ""
+        case .height: return auth.heightCm ?? ""
+        case .weight: return auth.weightKg ?? ""
         case .health: return auth.healthIssues ?? ""
         }
     }
@@ -259,6 +268,12 @@ struct ProfileView: View {
                     try await auth.updateProfile(email: newValue)
                 case .age:
                     try await auth.updateProfile(age: Int(newValue))
+                case .gender:
+                    try await auth.updateProfile(gender: newValue.lowercased())
+                case .height:
+                    try await auth.updateProfile(heightCm: Int(newValue))
+                case .weight:
+                    try await auth.updateProfile(weightKg: Int(newValue))
                 case .health:
                     try await auth.updateProfile(healthIssues: newValue)
                 }
@@ -348,9 +363,12 @@ struct EditFieldSheet: View {
     }
     private var fieldName: String {
         switch field {
-        case .name: return "Name"
-        case .email: return "Email"
-        case .age: return "Age"
+        case .name:   return "Name"
+        case .email:  return "Email"
+        case .age:    return "Age"
+        case .gender: return "Gender"
+        case .height: return "Height (cm)"
+        case .weight: return "Weight (kg)"
         case .health: return "Health Issues"
         }
     }
