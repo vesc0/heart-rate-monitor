@@ -57,7 +57,9 @@ final class AuthViewModel: ObservableObject {
         tokenObserver = NotificationCenter.default.addObserver(
             forName: .authTokenExpired, object: nil, queue: .main
         ) { [weak self] _ in
-            self?.handleTokenExpired()
+            Task { @MainActor [weak self] in
+                self?.handleTokenExpired()
+            }
         }
     }
 
