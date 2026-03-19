@@ -332,10 +332,10 @@ struct HistoryView: View {
                                         Text("\(entry.bpm) BPM")
                                             .fontWeight(.semibold)
                                         if let stress = entry.stressLevel {
-                                            Text(stress)
+                                            Text(stressDisplayText(for: stress))
                                                 .font(.caption)
                                                 .fontWeight(.medium)
-                                                .foregroundColor(stress == "Stressed" ? .red : .green)
+                                                .foregroundColor(stressColor(for: stress))
                                         }
                                     }
                                     Spacer(minLength: 8)
@@ -482,6 +482,26 @@ private extension HistoryView {
         let df = DateFormatter()
         df.dateFormat = "EEE d"
         return df.string(from: date)
+    }
+
+    func stressColor(for stress: String) -> Color {
+        if let pct = Int(stress.replacingOccurrences(of: "%", with: "").trimmingCharacters(in: .whitespacesAndNewlines)) {
+            if pct >= 70 { return .red }
+            if pct >= 40 { return .orange }
+            return .green
+        }
+
+        let normalized = stress.lowercased()
+        if normalized.contains("high") || normalized.contains("stressed") { return .red }
+        if normalized.contains("medium") || normalized.contains("moderate") { return .orange }
+        return .green
+    }
+
+    func stressDisplayText(for stress: String) -> String {
+        if let pct = Int(stress.replacingOccurrences(of: "%", with: "").trimmingCharacters(in: .whitespacesAndNewlines)) {
+            return "\(pct)% stressed"
+        }
+        return stress
     }
     
     var measurementsHeaderTitle: String {

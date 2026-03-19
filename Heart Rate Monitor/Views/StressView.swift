@@ -195,8 +195,7 @@ struct StressView: View {
                             id: old.id,
                             stressLevel: level
                         )
-                        vm.log[idx] = updated
-                        vm.saveLocal()
+                        vm.updateEntry(updated)
                     }
                 }
             }

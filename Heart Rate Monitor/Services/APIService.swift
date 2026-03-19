@@ -337,7 +337,7 @@ final class APIService {
     func predictStress(features: StressPredictRequest) async throws -> StressPredictResponse {
         let bodyData = try JSONEncoder().encode(features)
         let bodyDict = try JSONSerialization.jsonObject(with: bodyData) as? [String: Any] ?? [:]
-        return try await request(.post, path: "/stress-predict", body: bodyDict, authenticated: true)
+        return try await request(.post, path: "/stress-predict-llm", body: bodyDict, authenticated: true)
     }
 
     // MARK: - Internals

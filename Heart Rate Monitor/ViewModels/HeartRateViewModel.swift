@@ -202,6 +202,14 @@ class HeartRateViewModel: ObservableObject {
         syncDelete(ids: ids)
     }
 
+    // Update a single existing entry locally and sync the latest value to the server.
+    func updateEntry(_ entry: HeartRateEntry) {
+        guard let idx = log.firstIndex(where: { $0.id == entry.id }) else { return }
+        log[idx] = entry
+        saveLocal()
+        syncCreate(entry)
+    }
+
     // Persist the current log to UserDefaults (local cache only).
     func saveLocal() {
         if let encoded = try? JSONEncoder().encode(log) {
