@@ -20,23 +20,17 @@ struct ContentView: View {
                 }
                 .tag(1)
 
-            StressView(vm: vm)
-                .tabItem {
-                    Label("Stress", systemImage: "brain.head.profile")
-                }
-                .tag(2)
-
             HistoryView(vm: vm)
                 .tabItem {
-                    Label("History", systemImage: "list.bullet")
+                    Label("Stats", systemImage: "list.bullet")
                 }
-                .tag(3)
+                .tag(2)
 
             ProfileView()
                 .tabItem {
                     Label("Profile", systemImage: "person.crop.circle")
                 }
-                .tag(4)
+                .tag(3)
         }
         .environmentObject(auth)
         // Sync heart-rate data when auth state changes

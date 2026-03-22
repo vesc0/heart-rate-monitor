@@ -14,15 +14,25 @@ struct ProfileView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
+            Group {
                 if auth.isSignedIn {
-                    signedInContent
+                    ScrollView {
+                        signedInContent
+                    }
                 } else {
                     signedOutContent
                 }
             }
-            .scrollDismissesKeyboard(.interactively)
-            .background(Color(.systemGroupedBackground))
+            .if(!auth.isSignedIn) { view in
+                view
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                    .background(Color(.systemGroupedBackground))
+            }
+            .if(auth.isSignedIn) { view in
+                view
+                    .scrollDismissesKeyboard(.interactively)
+                    .background(Color(.systemGroupedBackground))
+            }
             .sheet(isPresented: $showAuthSheet) {
                 AuthSheetView(selectedTab: $selectedAuthTab)
                     .environmentObject(auth)
@@ -55,8 +65,6 @@ struct ProfileView: View {
 
     private var signedOutContent: some View {
         VStack(spacing: 24) {
-            Spacer().frame(height: 60)
-
             Image(systemName: "person.crop.circle.fill")
                 .font(.system(size: 72))
                 .foregroundStyle(.secondary.opacity(0.5))
@@ -89,10 +97,8 @@ struct ProfileView: View {
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 40)
-
-            Spacer()
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         .padding()
     }
 

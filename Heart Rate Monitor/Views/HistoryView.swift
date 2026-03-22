@@ -12,34 +12,27 @@ struct HistoryView: View {
     @ObservedObject var vm: HeartRateViewModel
     @State private var selectedEntries = Set<HeartRateEntry.ID>()
     @State private var isSelectionMode = false
-    @State private var rangeMode: RangeMode = .weekly
+    @State private var metricMode: HistoryMetric = .heartRate
     @State private var visibleCount: Int = 5
-    
-    // Paging offsets
-    @State private var weekOffset: Int = 0    // 0 = current week, -1 = previous week
+
     @State private var monthOffset: Int = 0   // 0 = current month, -1 = previous month
-    
-    // Selection for filtering the list
     @State private var selectedDay: Date? = nil
-    
-    // Calendar helpers
+
     private var calendar: Calendar {
         var cal = Calendar.current
         cal.firstWeekday = 2 // Monday
         return cal
     }
     private var todayStart: Date { calendar.startOfDay(for: Date()) }
-    
-    // MARK: - Seed sample data (debug/demo)
+
     private var shouldSeed: Bool {
         vm.log.isEmpty
     }
-    
+
     private func seedSampleDataIfNeeded() {
         guard shouldSeed else { return }
         var entries: [HeartRateEntry] = []
-        
-        // Generate ~4.5 months of daily data with 1-3 measurements per day
+
         let daysBack = 135
         for d in 0..<daysBack {
             guard let dayDate = calendar.date(byAdding: .day, value: -d, to: todayStart) else { continue }
@@ -53,66 +46,70 @@ struct HistoryView: View {
                 comps.hour = hour + i
                 comps.minute = minute
                 let ts = calendar.date(from: comps) ?? dayDate
-                entries.append(HeartRateEntry(bpm: bpm, date: ts))
+
+                // Include stress demo entries so Stress monthly mode has data too.
+                let stress: String? = Bool.random() ? String(format: "%d%%", Int.random(in: 18...92)) : nil
+                entries.append(HeartRateEntry(bpm: bpm, date: ts, stressLevel: stress))
             }
         }
         entries.sort { $0.date > $1.date }
         vm.log = entries
         vm.saveData()
     }
-    
-    // MARK: - Aggregations
-    private var dailyRangesAll: [DailyBPMRange] {
+
+    private var heartRateDailyRangesAll: [DailyMetricRange] {
         let grouped = Dictionary(grouping: vm.log) { entry in
             calendar.startOfDay(for: entry.date)
         }
-        .map { (dayStart, entries) -> DailyBPMRange in
-            let minBPM = entries.map(\.bpm).min() ?? 0
-            let maxBPM = entries.map(\.bpm).max() ?? 0
-            let avgBPM: Int = {
-                guard !entries.isEmpty else { return 0 }
-                let sum = entries.reduce(0) { $0 + $1.bpm }
-                return sum / entries.count
+        .map { (dayStart, entries) -> DailyMetricRange in
+            let values = entries.map(\.bpm)
+            let minValue = values.min() ?? 0
+            let maxValue = values.max() ?? 0
+            let avgValue: Int = {
+                guard !values.isEmpty else { return 0 }
+                return values.reduce(0, +) / values.count
             }()
-            return DailyBPMRange(day: dayStart, min: minBPM, max: maxBPM, avg: avgBPM)
+            return DailyMetricRange(day: dayStart, min: minValue, max: maxValue, avg: avgValue)
         }
         .sorted { $0.day < $1.day }
         return grouped
     }
-    
-    // MARK: - Period computations
-    private var currentWeekRange: (start: Date, end: Date) {
-        let weekday = calendar.component(.weekday, from: todayStart)
-        let daysFromMonday = (weekday == 1) ? 6 : (weekday - 2)
-        let monday = calendar.date(byAdding: .day, value: -daysFromMonday, to: todayStart) ?? todayStart
-        let start = calendar.date(byAdding: .day, value: weekOffset * 7, to: monday) ?? monday
-        let end = calendar.date(byAdding: .day, value: 6, to: start) ?? start
-        return (start, end)
+
+    private var stressDailyRangesAll: [DailyMetricRange] {
+        let stressEntries = vm.log.compactMap { entry -> (Date, Int)? in
+            guard let stress = entry.stressLevel, let pct = stressPercentage(from: stress) else { return nil }
+            return (entry.date, pct)
+        }
+
+        let grouped = Dictionary(grouping: stressEntries) { pair in
+            calendar.startOfDay(for: pair.0)
+        }
+        .map { (dayStart, entries) -> DailyMetricRange in
+            let values = entries.map { $0.1 }
+            let minValue = values.min() ?? 0
+            let maxValue = values.max() ?? 0
+            let avgValue: Int = {
+                guard !values.isEmpty else { return 0 }
+                return values.reduce(0, +) / values.count
+            }()
+            return DailyMetricRange(day: dayStart, min: minValue, max: maxValue, avg: avgValue)
+        }
+        .sorted { $0.day < $1.day }
+        return grouped
     }
-    
-    private var weekDays: [Date] {
-        let (start, _) = currentWeekRange
-        return (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: start) }
-    }
-    
-    // Day boundary ticks for weekly (8 boundaries around 7 days)
-    private var weekBoundaryDays: [Date] {
-        let (start, _) = currentWeekRange
-        return (0...7).compactMap { calendar.date(byAdding: .day, value: $0, to: start) }
-    }
-    
+
     private var currentMonthStart: Date {
         let comps = calendar.dateComponents([.year, .month], from: todayStart)
         let startOfCurrent = calendar.date(from: comps) ?? todayStart
         return calendar.date(byAdding: .month, value: monthOffset, to: startOfCurrent) ?? startOfCurrent
     }
-    
+
     private var currentMonthRange: (start: Date, end: Date) {
         let start = currentMonthStart
         let end = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: start) ?? start
         return (start, end)
     }
-    
+
     private var monthDays: [Date] {
         let (start, end) = currentMonthRange
         var days: [Date] = []
@@ -123,8 +120,7 @@ struct HistoryView: View {
         }
         return days
     }
-    
-    // Ticks for 1, 10, 20, and last day of the month
+
     private var monthlyTickDays: [Date] {
         let (start, end) = currentMonthRange
         var ticks: [Date] = []
@@ -134,25 +130,18 @@ struct HistoryView: View {
         ticks.append(end)
         return ticks
     }
-    
-    private var dailyRangesForCurrentWeek: [DailyBPMRange] {
-        let dict = Dictionary(uniqueKeysWithValues: dailyRangesAll.map { ($0.day, $0) })
-        return weekDays.compactMap { dict[$0] }
-    }
-    
-    private var dailyRangesForCurrentMonth: [DailyBPMRange] {
-        let dict = Dictionary(uniqueKeysWithValues: dailyRangesAll.map { ($0.day, $0) })
+
+    private var dailyRangesForCurrentMonth: [DailyMetricRange] {
+        let source = metricMode == .heartRate ? heartRateDailyRangesAll : stressDailyRangesAll
+        let dict = Dictionary(uniqueKeysWithValues: source.map { ($0.day, $0) })
         return monthDays.compactMap { dict[$0] }
     }
-    
-    // Period stats (min/avg/max)
-    private var weekStats: PeriodStats? {
-        aggregateStats(for: dailyRangesForCurrentWeek)
-    }
+
     private var monthStats: PeriodStats? {
         aggregateStats(for: dailyRangesForCurrentMonth)
     }
-    private func aggregateStats(for days: [DailyBPMRange]) -> PeriodStats? {
+
+    private func aggregateStats(for days: [DailyMetricRange]) -> PeriodStats? {
         guard !days.isEmpty else { return nil }
         let dayMins = days.map(\.min).filter { $0 > 0 }
         let dayMaxs = days.map(\.max).filter { $0 > 0 }
@@ -163,64 +152,49 @@ struct HistoryView: View {
         let avgVal = dayAvgs.reduce(0, +) / dayAvgs.count
         return PeriodStats(min: minVal, avg: avgVal, max: maxVal)
     }
-    
-    // Stats to display
+
     private var displayStats: PeriodStats? {
-        switch rangeMode {
-        case .weekly:
-            if let sel = selectedDay,
-               let day = dailyRangesAll.first(where: { calendar.isDate($0.day, inSameDayAs: sel) }) {
-                return PeriodStats(min: day.min, avg: day.avg, max: day.max)
-            }
-            return weekStats
-        case .monthly:
-            return monthStats
+        if let sel = selectedDay,
+           let day = dailyRangesForCurrentMonth.first(where: { calendar.isDate($0.day, inSameDayAs: sel) }) {
+            return PeriodStats(min: day.min, avg: day.avg, max: day.max)
         }
+        return monthStats
     }
-    
-    // Measurements filtering
+
     private var filteredMeasurements: [HeartRateEntry] {
-        switch rangeMode {
-        case .weekly:
-            let (start, end) = currentWeekRange
-            if let sel = selectedDay {
-                let startSel = sel
-                let endSel = sel.addingTimeInterval(24 * 60 * 60 - 1)
-                return vm.log.filter { $0.date >= startSel && $0.date <= endSel }
-            } else {
-                return vm.log.filter { $0.date >= start && $0.date <= end.addingTimeInterval(24*60*60 - 1) }
+        let (start, end) = currentMonthRange
+        let base = vm.log.filter { $0.date >= start && $0.date <= end.addingTimeInterval(24*60*60 - 1) }
+        let metricFiltered: [HeartRateEntry] = {
+            switch metricMode {
+            case .heartRate:
+                return base
+            case .stress:
+                return base.filter { $0.stressLevel != nil }
             }
-        case .monthly:
-            let (start, end) = currentMonthRange
-            return vm.log.filter { $0.date >= start && $0.date <= end.addingTimeInterval(24*60*60 - 1) }
+        }()
+
+        if let sel = selectedDay {
+            let startSel = sel
+            let endSel = sel.addingTimeInterval(24 * 60 * 60 - 1)
+            return metricFiltered.filter { $0.date >= startSel && $0.date <= endSel }
         }
+
+        return metricFiltered
     }
-    
+
     private var pagedLog: ArraySlice<HeartRateEntry> {
         let end = min(visibleCount, filteredMeasurements.count)
         return filteredMeasurements.sorted { $0.date > $1.date }.prefix(end)
     }
-    
+
     private var hasMore: Bool {
         visibleCount < filteredMeasurements.count
     }
-    
+
     private var periodTitle: String {
-        switch rangeMode {
-        case .weekly:
-            let (start, end) = currentWeekRange
-            let fmt = DateFormatter()
-            fmt.dateFormat = "MMM d"
-            let yearFmt = DateFormatter()
-            yearFmt.dateFormat = "yyyy"
-            let sameYear = calendar.component(.year, from: start) == calendar.component(.year, from: end)
-            let title = "\(fmt.string(from: start)) – \(fmt.string(from: end))" + (sameYear ? ", \(yearFmt.string(from: end))" : "")
-            return title
-        case .monthly:
-            let fmt = DateFormatter()
-            fmt.dateFormat = "LLLL yyyy"
-            return fmt.string(from: currentMonthStart)
-        }
+        let fmt = DateFormatter()
+        fmt.dateFormat = "LLLL yyyy"
+        return fmt.string(from: currentMonthStart)
     }
 
     var body: some View {
@@ -231,12 +205,12 @@ struct HistoryView: View {
                         Text("No Records")
                             .font(.title2)
                             .foregroundColor(.secondary)
-                        Text("Records will appear here after you complete a measurement")
+                        Text("Records will appear here after you complete a measurement.")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal)
-                        
+
                         Button("Load Demo Data") {
                             seedSampleDataIfNeeded()
                         }
@@ -249,18 +223,17 @@ struct HistoryView: View {
                 } else {
                     List {
                         Section {
-                            Picker("Range", selection: $rangeMode) {
-                                Text("Weekly").tag(RangeMode.weekly)
-                                Text("Monthly").tag(RangeMode.monthly)
+                            Picker("Metric", selection: $metricMode) {
+                                Text("Heart Rate").tag(HistoryMetric.heartRate)
+                                Text("Stress").tag(HistoryMetric.stress)
                             }
                             .pickerStyle(.segmented)
                             .listRowSeparator(.hidden)
-                            
+
                             HStack {
                                 Button {
                                     withAnimation(.easeInOut) {
-                                        if rangeMode == .weekly { weekOffset -= 1 }
-                                        else { monthOffset -= 1 }
+                                        monthOffset -= 1
                                         selectedDay = nil
                                         visibleCount = min(visibleCount, filteredMeasurements.count)
                                     }
@@ -268,21 +241,17 @@ struct HistoryView: View {
                                     Image(systemName: "chevron.left")
                                 }
                                 .buttonStyle(.plain)
-                                
+
                                 Spacer()
-                                
+
                                 Text(periodTitle)
                                     .font(.headline)
-                                
+
                                 Spacer()
-                                
+
                                 Button {
                                     withAnimation(.easeInOut) {
-                                        if rangeMode == .weekly {
-                                            weekOffset = min(0, weekOffset + 1)
-                                        } else {
-                                            monthOffset = min(0, monthOffset + 1)
-                                        }
+                                        monthOffset = min(0, monthOffset + 1)
                                         selectedDay = nil
                                         visibleCount = min(visibleCount, filteredMeasurements.count)
                                     }
@@ -290,19 +259,19 @@ struct HistoryView: View {
                                     Image(systemName: "chevron.right")
                                 }
                                 .buttonStyle(.plain)
-                                .disabled(rangeMode == .weekly ? weekOffset == 0 : monthOffset == 0)
-                                .opacity((rangeMode == .weekly ? weekOffset == 0 : monthOffset == 0) ? 0.4 : 1)
+                                .disabled(monthOffset == 0)
+                                .opacity(monthOffset == 0 ? 0.4 : 1)
                             }
                             .padding(.top, 4)
                             .listRowSeparator(.hidden)
-                            
+
                             chartView()
                                 .frame(height: 240)
                                 .padding(.bottom, 6)
                                 .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
                                 .listRowSeparator(.hidden)
                         } header: {
-                            Text("Daily Range")
+                            Text(metricMode == .heartRate ? "Heart Rate (Monthly)" : "Stress (Monthly)")
                         } footer: {
                             if let stats = displayStats {
                                 VStack(spacing: 10) {
@@ -319,7 +288,7 @@ struct HistoryView: View {
                                 .padding(.bottom, 14)
                             }
                         }
-                        
+
                         Section {
                             ForEach(pagedLog) { entry in
                                 HStack(spacing: 12) {
@@ -327,7 +296,7 @@ struct HistoryView: View {
                                         Image(systemName: selectedEntries.contains(entry.id) ? "checkmark.circle.fill" : "circle")
                                             .foregroundColor(selectedEntries.contains(entry.id) ? .accentColor : .gray)
                                     }
-                                    
+
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text("\(entry.bpm) BPM")
                                             .fontWeight(.semibold)
@@ -363,7 +332,7 @@ struct HistoryView: View {
                                 vm.deleteEntries(ids: toDelete)
                                 visibleCount = min(visibleCount, filteredMeasurements.count)
                             }
-                            
+
                             if hasMore {
                                 Button {
                                     visibleCount = min(visibleCount + 5, filteredMeasurements.count)
@@ -388,13 +357,13 @@ struct HistoryView: View {
                                         selectedEntries.removeAll()
                                     }
                                     .buttonStyle(.plain)
-                                    
+
                                     Button("Select All") {
                                         let ids = filteredMeasurements.map(\.id)
                                         selectedEntries = Set(ids)
                                     }
                                     .buttonStyle(.plain)
-                                    
+
                                     Button("Delete") {
                                         vm.deleteEntries(ids: selectedEntries)
                                         isSelectionMode = false
@@ -415,34 +384,27 @@ struct HistoryView: View {
                     }
                 }
             }
-            .navigationTitle("History")
+            .navigationTitle("Stats")
         }
         .onChange(of: vm.log) { _, _ in
             visibleCount = min(max(5, visibleCount), filteredMeasurements.count)
             selectedEntries = selectedEntries.filter { id in vm.log.contains(where: { $0.id == id }) }
         }
-        .onChange(of: rangeMode) { _, newMode in
-            if newMode == .weekly {
-                weekOffset = 0
-                selectedDay = nil
-            } else {
-                monthOffset = 0
-                selectedDay = nil
-            }
+        .onChange(of: metricMode) { _, _ in
+            monthOffset = 0
+            selectedDay = nil
             visibleCount = min(visibleCount, filteredMeasurements.count)
         }
     }
 }
 
-// MARK: - Helpers
-
-private enum RangeMode: String, CaseIterable, Identifiable {
-    case weekly
-    case monthly
+private enum HistoryMetric: String, CaseIterable, Identifiable {
+    case heartRate = "Heart Rate"
+    case stress = "Stress"
     var id: String { rawValue }
 }
 
-private struct DailyBPMRange: Identifiable, Equatable {
+private struct DailyMetricRange: Identifiable, Equatable {
     var id: Date { day }
     let day: Date
     let min: Int
@@ -457,18 +419,15 @@ private struct PeriodStats {
 }
 
 private extension HistoryView {
-    func threeLetterWeekday(for date: Date) -> String {
-        let df = DateFormatter()
-        df.locale = Locale.current
-        df.dateFormat = "EEE"
-        return df.string(from: date)
+    func stressPercentage(from stress: String) -> Int? {
+        Int(stress.replacingOccurrences(of: "%", with: "").trimmingCharacters(in: .whitespacesAndNewlines))
     }
-    
-    func isSelected(_ day: DailyBPMRange) -> Bool {
+
+    func isSelected(_ day: DailyMetricRange) -> Bool {
         guard let s = selectedDay else { return false }
         return calendar.isDate(s, inSameDayAs: day.day)
     }
-    
+
     func toggleSelection(for date: Date) {
         if let s = selectedDay, calendar.isDate(s, inSameDayAs: date) {
             selectedDay = nil
@@ -477,7 +436,7 @@ private extension HistoryView {
         }
         visibleCount = min(max(5, visibleCount), filteredMeasurements.count)
     }
-    
+
     func dayLabel(for date: Date) -> String {
         let df = DateFormatter()
         df.dateFormat = "EEE d"
@@ -485,7 +444,7 @@ private extension HistoryView {
     }
 
     func stressColor(for stress: String) -> Color {
-        if let pct = Int(stress.replacingOccurrences(of: "%", with: "").trimmingCharacters(in: .whitespacesAndNewlines)) {
+        if let pct = stressPercentage(from: stress) {
             if pct >= 70 { return .red }
             if pct >= 40 { return .orange }
             return .green
@@ -498,63 +457,42 @@ private extension HistoryView {
     }
 
     func stressDisplayText(for stress: String) -> String {
-        if let pct = Int(stress.replacingOccurrences(of: "%", with: "").trimmingCharacters(in: .whitespacesAndNewlines)) {
+        if let pct = stressPercentage(from: stress) {
             return "\(pct)% stressed"
         }
         return stress
     }
-    
+
     var measurementsHeaderTitle: String {
-        switch rangeMode {
-        case .weekly:
-            let (start, end) = currentWeekRange
-            let df = DateFormatter()
-            df.dateFormat = "MMM d"
-            let yearFmt = DateFormatter(); yearFmt.dateFormat = "yyyy"
-            let sameYear = calendar.component(.year, from: start) == calendar.component(.year, from: end)
-            let rangeStr = "\(df.string(from: start)) – \(df.string(from: end))" + (sameYear ? ", \(yearFmt.string(from: end))" : "")
-            if let s = selectedDay {
-                let d = DateFormatter(); d.dateStyle = .medium
-                return "Measurements – \(d.string(from: s))"
-            } else {
-                return "Measurements – \(rangeStr)"
-            }
-        case .monthly:
-            let df = DateFormatter()
-            df.dateFormat = "LLLL yyyy"
-            return "Measurements – \(df.string(from: currentMonthStart))"
+        let df = DateFormatter()
+        df.dateFormat = "LLLL yyyy"
+        if let s = selectedDay {
+            let dayFmt = DateFormatter()
+            dayFmt.dateStyle = .medium
+            return "Measurements – \(dayFmt.string(from: s))"
         }
+        return "Measurements – \(df.string(from: currentMonthStart))"
     }
-    
-    // X scale domain used to center marks inside day bands
+
+    var valueUnitLabel: String {
+        metricMode == .heartRate ? "BPM" : "%"
+    }
+
     var chartXDomain: ClosedRange<Date> {
-        switch rangeMode {
-        case .weekly:
-            // Center rule marks within daily bands and leave extra room after the last boundary
-            let (start, end) = currentWeekRange
-            let left = calendar.date(byAdding: .hour, value: -12, to: start) ?? start
-            // extend a full day beyond Sunday
-            let rightPad = calendar.date(byAdding: .hour, value: 36, to: end) ?? end
-            return left...rightPad
-        case .monthly:
-            let (start, end) = currentMonthRange
-            let left = calendar.date(byAdding: .hour, value: -12, to: start) ?? start
-            // extend ~2 days beyond the last day to make the "last day" label clearly visible
-            let rightPad = calendar.date(byAdding: .hour, value: 60, to: end) ?? end
-            return left...rightPad
-        }
+        let (start, end) = currentMonthRange
+        let left = calendar.date(byAdding: .hour, value: -12, to: start) ?? start
+        let rightPad = calendar.date(byAdding: .hour, value: 60, to: end) ?? end
+        return left...rightPad
     }
-    
-    // MARK: Chart view
+
     @ViewBuilder
     func chartView() -> some View {
-        let baseData: [DailyBPMRange] = (rangeMode == .weekly) ? dailyRangesForCurrentWeek : dailyRangesForCurrentMonth
-        let chartData: [DailyBPMRange] = baseData.filter { $0.min != 0 || $0.max != 0 }
-        
+        let baseData: [DailyMetricRange] = dailyRangesForCurrentMonth
+        let chartData: [DailyMetricRange] = baseData.filter { $0.min != 0 || $0.max != 0 }
+
         Chart(chartData) { day in
             ChartBar(
                 day: day,
-                rangeMode: rangeMode,
                 isSelected: isSelected(day),
                 hasSelection: selectedDay != nil,
                 labelProvider: { dayLabel(for: day.day) }
@@ -562,73 +500,43 @@ private extension HistoryView {
         }
         .chartXScale(domain: chartXDomain)
         .chartXAxis {
-            if rangeMode == .weekly {
-                weeklyXAxis()
-            } else {
-                monthlyXAxis()
-            }
+            monthlyXAxis()
         }
         .chartYAxis {
             AxisMarks(position: .trailing)
         }
         .chartOverlay { proxy in
-            if rangeMode == .weekly {
-                // Use a tap gesture without making the whole overlay hit-testable
-                GeometryReader { geo in
-                    Color.clear
-                        .allowsHitTesting(false) // default: pass-through
-                        .background(
-                            // A transparent layer that only reacts to taps; if the tap isn't near a bar, nothing happens and List scrolling wins.
-                            TapCatcher { location in
-                                // Convert to chart-space values
-                                guard let tappedDate: Date = proxy.value(atX: location.x) else { return }
-                                let dayStart = calendar.startOfDay(for: tappedDate)
-                                guard let dayData = dailyRangesForCurrentWeek.first(where: { calendar.isDate($0.day, inSameDayAs: dayStart) }) else { return }
-                                guard let dayX: CGFloat = proxy.position(forX: dayData.day) else { return }
-                                
-                                // X proximity to the rule mark
-                                let dx = abs(dayX - location.x)
-                                let xHitSlop: CGFloat = 18
-                                guard dx <= xHitSlop else { return }
-                                
-                                // Y within min–max band (with padding)
-                                guard
-                                    let yMin: CGFloat = proxy.position(forY: Double(dayData.min)),
-                                    let yMax: CGFloat = proxy.position(forY: Double(dayData.max))
-                                else { return }
-                                let yLow = min(yMin, yMax)
-                                let yHigh = max(yMin, yMax)
-                                let yPadding: CGFloat = 14
-                                let yHit = (location.y >= (yLow - yPadding)) && (location.y <= (yHigh + yPadding))
-                                guard yHit else { return }
-                                
-                                // Only when both x and y are within the hit area toggle selection
-                                toggleSelection(for: dayData.day)
-                            }
-                        )
-                }
+            GeometryReader { _ in
+                Color.clear
+                    .allowsHitTesting(false)
+                    .background(
+                        TapCatcher { location in
+                            guard let tappedDate: Date = proxy.value(atX: location.x) else { return }
+                            let dayStart = calendar.startOfDay(for: tappedDate)
+                            guard let dayData = dailyRangesForCurrentMonth.first(where: { calendar.isDate($0.day, inSameDayAs: dayStart) }) else { return }
+                            guard let dayX: CGFloat = proxy.position(forX: dayData.day) else { return }
+
+                            let dx = abs(dayX - location.x)
+                            let xHitSlop: CGFloat = 18
+                            guard dx <= xHitSlop else { return }
+
+                            guard
+                                let yMin: CGFloat = proxy.position(forY: Double(dayData.min)),
+                                let yMax: CGFloat = proxy.position(forY: Double(dayData.max))
+                            else { return }
+                            let yLow = min(yMin, yMax)
+                            let yHigh = max(yMin, yMax)
+                            let yPadding: CGFloat = 14
+                            let yHit = (location.y >= (yLow - yPadding)) && (location.y <= (yHigh + yPadding))
+                            guard yHit else { return }
+
+                            toggleSelection(for: dayData.day)
+                        }
+                    )
             }
         }
     }
-    
-    // Weekly axis: grid lines at day boundaries, labels at day centers (Mon..Sun)
-    @AxisContentBuilder
-    func weeklyXAxis() -> some AxisContent {
-        // Grid lines and ticks at boundaries
-        AxisMarks(values: weekBoundaryDays) { _ in
-            AxisGridLine()
-            AxisTick()
-            AxisValueLabel("") // no labels on boundaries
-        }
-        // Labels at day centers (Mon..Sun)
-        AxisMarks(values: weekDays) { value in
-            if let dateValue: Date = value.as(Date.self) {
-                AxisValueLabel(threeLetterWeekday(for: dateValue))
-            }
-        }
-    }
-    
-    // Monthly axis: only 1, 10, 20, last day — both grid and label
+
     @AxisContentBuilder
     func monthlyXAxis() -> some AxisContent {
         AxisMarks(values: monthlyTickDays) { value in
@@ -640,13 +548,13 @@ private extension HistoryView {
             }
         }
     }
-    
+
     @ViewBuilder
     func statPillLarge(title: String, value: Int) -> some View {
         VStack(spacing: 2) {
             Text(title.uppercased())
                 .font(.caption.weight(.semibold))
-            Text("\(value) BPM")
+            Text("\(value) \(valueUnitLabel)")
                 .font(.subheadline.weight(.semibold))
         }
         .padding(.vertical, 8)
@@ -655,43 +563,38 @@ private extension HistoryView {
     }
 }
 
-// MARK: - Small helper view to keep Chart closure simple
-
 private struct ChartBar: ChartContent {
-    let day: DailyBPMRange
-    let rangeMode: RangeMode
+    let day: DailyMetricRange
     let isSelected: Bool
     let hasSelection: Bool
     let labelProvider: () -> String
-    
+
     var body: some ChartContent {
-        let width: CGFloat = rangeMode == .weekly ? (isSelected ? 18 : 14) : 6
+        let width: CGFloat = isSelected ? 18 : 6
         let color: Color = isSelected ? .red : Color.red.opacity(0.85)
-        let alpha: Double = (rangeMode == .weekly && hasSelection) ? (isSelected ? 1.0 : 0.35) : 1.0
-        
+        let alpha: Double = hasSelection ? (isSelected ? 1.0 : 0.35) : 1.0
+
         RuleMark(
             x: .value("Day", day.day),
-            yStart: .value("Min BPM", day.min),
-            yEnd: .value("Max BPM", day.max)
+            yStart: .value("Min", day.min),
+            yEnd: .value("Max", day.max)
         )
         .foregroundStyle(color)
         .lineStyle(StrokeStyle(lineWidth: width, lineCap: .round))
         .opacity(alpha)
-        .accessibilityLabel(Text("\(labelProvider()): \(day.min)–\(day.max) BPM"))
+        .accessibilityLabel(Text("\(labelProvider()): \(day.min)–\(day.max)"))
     }
 }
 
-// MARK: - Tap catcher that doesn’t block scroll unless a valid tap occurs
-
 private struct TapCatcher: UIViewRepresentable {
     var onTap: (CGPoint) -> Void
-    
+
     func makeUIView(context: Context) -> PassThroughTapView {
         let view = PassThroughTapView()
         view.onTap = onTap
         return view
     }
-    
+
     func updateUIView(_ uiView: PassThroughTapView, context: Context) {
         uiView.onTap = onTap
     }
@@ -699,24 +602,22 @@ private struct TapCatcher: UIViewRepresentable {
 
 private final class PassThroughTapView: UIView {
     var onTap: ((CGPoint) -> Void)?
-    
+
     override init(frame: CGRect) {
         super.init(frame: frame)
         backgroundColor = .clear
         let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap(_:)))
         addGestureRecognizer(tap)
-        // Important: don’t block other gestures like scroll
         tap.cancelsTouchesInView = false
         tap.delaysTouchesBegan = false
         tap.delaysTouchesEnded = false
         isUserInteractionEnabled = true
     }
-    
+
     required init?(coder: NSCoder) { fatalError() }
-    
+
     @objc private func handleTap(_ gr: UITapGestureRecognizer) {
         let point = gr.location(in: self)
         onTap?(point)
     }
 }
-

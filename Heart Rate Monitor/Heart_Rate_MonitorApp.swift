@@ -9,9 +9,19 @@ import SwiftUI
 
 @main
 struct Heart_Rate_MonitorApp: App {
+    @AppStorage("hasSeenWelcome") private var hasSeenWelcome = false
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            Group {
+                if hasSeenWelcome {
+                    ContentView()
+                } else {
+                    WelcomeView {
+                        hasSeenWelcome = true
+                    }
+                }
+            }
                 .tint(.red) // Global red accent/tint for tabs, controls, etc.
         }
     }

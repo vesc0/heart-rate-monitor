@@ -21,7 +21,7 @@ struct SignUpView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Create Account")
+            Text("Create an Account")
                 .font(.largeTitle)
                 .fontWeight(.bold)
                 .padding(.bottom, 2)
@@ -118,7 +118,7 @@ struct SignUpView: View {
                         } else {
                             Image(systemName: "person.badge.plus.fill")
                         }
-                        Text("Create Account")
+                        Text("Create an Account")
                             .fontWeight(.semibold)
                     }
                     .frame(maxWidth: .infinity)
