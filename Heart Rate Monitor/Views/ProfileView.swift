@@ -2,10 +2,14 @@ import SwiftUI
 
 struct ProfileView: View {
     @EnvironmentObject private var auth: AuthViewModel
+    @ObservedObject var vm: HeartRateViewModel
     @State private var showAuthSheet = false
     @State private var selectedAuthTab = 0 // 0 = Login, 1 = Sign Up
     @State private var editingField: EditableField? = nil
     @State private var profileError: String?
+    @State private var isExportingHistory = false
+    @State private var healthExportMessage = ""
+    @State private var showHealthExportAlert = false
 
     enum EditableField: String, CaseIterable, Identifiable {
         case name, email, age, gender, height, weight, health
@@ -56,6 +60,11 @@ struct ProfileView: View {
                     showAuthSheet = false
                     profileError = nil
                 }
+            }
+            .alert("Apple Health Sync", isPresented: $showHealthExportAlert) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(healthExportMessage)
             }
             .navigationTitle("Profile")
         }
@@ -132,6 +141,71 @@ struct ProfileView: View {
                     profileRow(icon: "scalemass", label: "Weight (kg)", value: auth.weightKg ?? "", editable: .weight)
                     Divider().padding(.leading, 48)
                     profileRow(icon: "heart.text.clipboard", label: "Health", value: auth.healthIssues ?? "", editable: .health)
+                }
+                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Health")
+                    .font(.footnote)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.secondary)
+                    .textCase(.uppercase)
+                    .padding(.horizontal, 6)
+
+                VStack(spacing: 0) {
+                    Toggle(isOn: Binding(
+                        get: { vm.isAppleHealthSyncEnabled },
+                        set: { vm.setAppleHealthSyncEnabled($0) }
+                    )) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Save New Measurements To Apple Health")
+                            Text("When enabled, each new BPM result is written to Health.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .tint(.red)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+
+                    Divider().padding(.leading, 14)
+
+                    Button {
+                        exportHistoryToAppleHealth()
+                    } label: {
+                        HStack(spacing: 10) {
+                            if isExportingHistory {
+                                ProgressView()
+                                    .controlSize(.small)
+                            } else {
+                                Image(systemName: "arrow.triangle.2.circlepath")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(.red)
+                            }
+
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("One-Time Sync Past History")
+                                    .foregroundColor(.primary)
+                                Text("Export your existing app records into Apple Health.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
+
+                            if !isExportingHistory {
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 12)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isExportingHistory)
                 }
                 .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
@@ -286,6 +360,32 @@ struct ProfileView: View {
                 profileError = nil
             } catch {
                 profileError = error.localizedDescription
+            }
+        }
+    }
+
+    private func exportHistoryToAppleHealth() {
+        guard auth.isSignedIn, !isExportingHistory else { return }
+        isExportingHistory = true
+
+        Task {
+            let result = await vm.exportHistoryToAppleHealth()
+            let message: String
+
+            if result.totalCount == 0 {
+                message = "No measurements found to export."
+            } else if result.exportedCount == result.totalCount {
+                message = "Export completed. Synced \(result.exportedCount) measurements to Apple Health."
+            } else if result.exportedCount == 0 {
+                message = "Export could not be completed. Please allow Apple Health access and try again."
+            } else {
+                message = "Partial export: \(result.exportedCount) synced, \(result.failedCount) failed."
+            }
+
+            await MainActor.run {
+                healthExportMessage = message
+                showHealthExportAlert = true
+                isExportingHistory = false
             }
         }
     }

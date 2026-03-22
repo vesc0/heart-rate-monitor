@@ -16,6 +16,7 @@ class HeartRateViewModel: ObservableObject {
     @Published var secondsLeft: Int = 0
     @Published var log: [HeartRateEntry] = []
     @Published var canShowBPM: Bool = false
+    @Published var isAppleHealthSyncEnabled: Bool = true
 
     // Taps & computation
     private var tapTimes: [Date] = []
@@ -42,7 +43,9 @@ class HeartRateViewModel: ObservableObject {
 
     // Persistence
     private let saveKey = "HeartRateLog"
+    private let healthSyncEnabledKey = "AppleHealthSyncEnabled"
     private let api = APIService.shared
+    private let healthKit = HealthKitService.shared
 
     init() { loadData() }
 
@@ -193,6 +196,43 @@ class HeartRateViewModel: ObservableObject {
         log.insert(entry, at: 0)
         saveLocal()
         syncCreate(entry)
+        if isAppleHealthSyncEnabled {
+            Task {
+                _ = await healthKit.saveHeartRate(bpm: entry.bpm, at: entry.date)
+            }
+        }
+    }
+
+    func setAppleHealthSyncEnabled(_ enabled: Bool) {
+        isAppleHealthSyncEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: healthSyncEnabledKey)
+    }
+
+    struct AppleHealthExportResult {
+        let exportedCount: Int
+        let failedCount: Int
+        let totalCount: Int
+    }
+
+    func exportHistoryToAppleHealth() async -> AppleHealthExportResult {
+        let snapshot = log
+        guard !snapshot.isEmpty else {
+            return AppleHealthExportResult(exportedCount: 0, failedCount: 0, totalCount: 0)
+        }
+
+        let authorized = await healthKit.ensureWriteAuthorization()
+        guard authorized else {
+            return AppleHealthExportResult(exportedCount: 0, failedCount: snapshot.count, totalCount: snapshot.count)
+        }
+
+        var exported = 0
+        var failed = 0
+        for entry in snapshot {
+            let ok = await healthKit.saveHeartRate(bpm: entry.bpm, at: entry.date)
+            if ok { exported += 1 } else { failed += 1 }
+        }
+
+        return AppleHealthExportResult(exportedCount: exported, failedCount: failed, totalCount: snapshot.count)
     }
 
     // Delete entries by their IDs (locally + remote).
@@ -250,6 +290,12 @@ class HeartRateViewModel: ObservableObject {
     }
 
     private func loadData() {
+        if UserDefaults.standard.object(forKey: healthSyncEnabledKey) == nil {
+            isAppleHealthSyncEnabled = true
+        } else {
+            isAppleHealthSyncEnabled = UserDefaults.standard.bool(forKey: healthSyncEnabledKey)
+        }
+
         // Load cached data from UserDefaults first (instant)
         if let data = UserDefaults.standard.data(forKey: saveKey),
            let decoded = try? JSONDecoder().decode([HeartRateEntry].self, from: data) {
