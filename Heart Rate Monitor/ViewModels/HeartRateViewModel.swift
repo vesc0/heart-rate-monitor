@@ -272,9 +272,21 @@ class HeartRateViewModel: ObservableObject {
         Task { @MainActor [weak self] in
             guard let self else { return }
             do {
-                let remote = try await api.fetchHeartRateEntries()
-                // debug: fetched remote entries
-                self.log = remote.map {
+                var allRemote: [HeartRateEntryResponse] = []
+                var offset = 0
+                let pageSize = 500
+
+                while true {
+                    let page = try await api.fetchHeartRateEntries(limit: pageSize, offset: offset)
+                    allRemote.append(contentsOf: page)
+
+                    if page.count < pageSize {
+                        break
+                    }
+                    offset += pageSize
+                }
+
+                self.log = allRemote.map {
                     HeartRateEntry(
                         bpm: $0.bpm,
                         date: $0.recordedAt,

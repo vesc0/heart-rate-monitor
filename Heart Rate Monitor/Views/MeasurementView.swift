@@ -7,24 +7,29 @@
 
 import SwiftUI
 
-enum MeasurementMode: String, CaseIterable, Identifiable {
+enum MeasurementCategory: String, CaseIterable, Identifiable {
+    case heartRate = "Heart Rate"
+    case stress = "Stress"
+    var id: String { rawValue }
+}
+
+enum HeartRateMode: String, CaseIterable, Identifiable {
     case manual = "Manual"
     case automatic = "Automatic"
-    case stress = "Stress"
     var id: String { rawValue }
 }
 
 struct MeasurementView: View {
     @ObservedObject var vm: HeartRateViewModel
-    @State private var mode: MeasurementMode = .automatic
+    @State private var category: MeasurementCategory = .heartRate
+    @State private var heartRateMode: HeartRateMode = .automatic
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // Segmented picker pinned at top
-                Picker("Mode", selection: $mode) {
-                    ForEach(MeasurementMode.allCases) { m in
-                        Text(m.rawValue).tag(m)
+                Picker("Type", selection: $category) {
+                    ForEach(MeasurementCategory.allCases) { item in
+                        Text(item.rawValue).tag(item)
                     }
                 }
                 .pickerStyle(.segmented)
@@ -32,13 +37,27 @@ struct MeasurementView: View {
                 .padding(.top, 8)
                 .padding(.bottom, 4)
 
+                if category == .heartRate {
+                    Picker("Heart Rate Mode", selection: $heartRateMode) {
+                        ForEach(HeartRateMode.allCases) { item in
+                            Text(item.rawValue).tag(item)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal)
+                    .padding(.bottom, 4)
+                }
+
                 // Measurement content
                 Group {
-                    switch mode {
-                    case .manual:
-                        ManualContentView(vm: vm)
-                    case .automatic:
-                        AutoContentView(vm: vm)
+                    switch category {
+                    case .heartRate:
+                        switch heartRateMode {
+                        case .manual:
+                            ManualContentView(vm: vm)
+                        case .automatic:
+                            AutoContentView(vm: vm)
+                        }
                     case .stress:
                         StressContentView(vm: vm)
                     }
@@ -107,11 +126,7 @@ private struct StressContentView: View {
                             stressVM.startSession()
                         } label: {
                             Label("Start Stress Session", systemImage: "play.fill")
-                                .fontWeight(.semibold)
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(.red, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                                .foregroundColor(.white)
+                                .measurementPrimaryButtonStyle()
                         }
                         .buttonStyle(.plain)
                         .padding(.horizontal, 64)
@@ -273,11 +288,7 @@ private struct ManualContentView: View {
                         vm.startSession()
                     } label: {
                         Label("Start Manual Session", systemImage: "play.fill")
-                            .fontWeight(.semibold)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(.red, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                            .foregroundColor(.white)
+                            .measurementPrimaryButtonStyle()
                     }
                     .buttonStyle(.plain)
                     .padding(.horizontal, 64)
@@ -341,11 +352,7 @@ private struct ManualContentView: View {
                         vm.startNewSession()
                     } label: {
                         Label("New Measurement", systemImage: "arrow.counterclockwise")
-                            .fontWeight(.semibold)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(.red, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                            .foregroundColor(.white)
+                            .measurementPrimaryButtonStyle()
                     }
                     .buttonStyle(.plain)
                     .padding(.horizontal, 64)
@@ -412,11 +419,7 @@ private struct AutoContentView: View {
                             autoVM.startSession()
                         } label: {
                             Label("Start Automatic Session", systemImage: "play.fill")
-                                .fontWeight(.semibold)
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(.red, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                                .foregroundColor(.white)
+                                .measurementPrimaryButtonStyle()
                         }
                         .buttonStyle(.plain)
                         .padding(.horizontal, 64)
@@ -468,11 +471,7 @@ private struct AutoContentView: View {
                             autoVM.phase = .idle
                         } label: {
                             Label("New Measurement", systemImage: "arrow.counterclockwise")
-                                .fontWeight(.semibold)
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(.red, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                                .foregroundColor(.white)
+                                .measurementPrimaryButtonStyle()
                         }
                         .buttonStyle(.plain)
                         .padding(.horizontal, 64)
@@ -510,5 +509,19 @@ private struct AutoContentView: View {
                 vm.addEntry(entry)
             }
         }
+    }
+}
+
+private extension View {
+    func measurementPrimaryButtonStyle() -> some View {
+        self
+            .fontWeight(.semibold)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(
+                LinearGradient(colors: [.pink, .red], startPoint: .topLeading, endPoint: .bottomTrailing),
+                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+            )
+            .foregroundColor(.white)
     }
 }

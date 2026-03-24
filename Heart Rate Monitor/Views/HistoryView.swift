@@ -13,7 +13,7 @@ struct HistoryView: View {
     @State private var selectedEntries = Set<HeartRateEntry.ID>()
     @State private var isSelectionMode = false
     @State private var metricMode: HistoryMetric = .heartRate
-    @State private var visibleCount: Int = 5
+    @State private var visibleCount: Int = 20
 
     @State private var monthOffset: Int = 0   // 0 = current month, -1 = previous month
     @State private var selectedDay: Date? = nil
@@ -182,14 +182,20 @@ struct HistoryView: View {
         return metricFiltered
     }
 
-    private var pagedLog: ArraySlice<HeartRateEntry> {
+    private var sortedFilteredMeasurements: [HeartRateEntry] {
+        filteredMeasurements.sorted { $0.date > $1.date }
+    }
+
+    private var pagedLog: [HeartRateEntry] {
         let end = min(visibleCount, filteredMeasurements.count)
-        return filteredMeasurements.sorted { $0.date > $1.date }.prefix(end)
+        return Array(sortedFilteredMeasurements.prefix(end))
     }
 
     private var hasMore: Bool {
         visibleCount < filteredMeasurements.count
     }
+
+    private let pageSize = 20
 
     private var periodTitle: String {
         let fmt = DateFormatter()
@@ -199,29 +205,33 @@ struct HistoryView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if vm.log.isEmpty {
-                    VStack(spacing: 8) {
-                        Text("No Records")
-                            .font(.title2)
-                            .foregroundColor(.secondary)
-                        Text("Records will appear here after you complete a measurement.")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal)
+            ZStack {
+                Color(.systemGroupedBackground)
+                    .ignoresSafeArea()
 
-                        Button("Load Demo Data") {
-                            seedSampleDataIfNeeded()
+                Group {
+                    if vm.log.isEmpty {
+                        VStack(spacing: 8) {
+                            Text("No Records")
+                                .font(.title2)
+                                .foregroundColor(.secondary)
+                            Text("Records will appear here after you complete a measurement.")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal)
+
+                            Button("Load Demo Data") {
+                                seedSampleDataIfNeeded()
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(.red)
+                            .padding(.top, 8)
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(.red)
-                        .padding(.top, 8)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                    .padding()
-                } else {
-                    List {
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                        .padding()
+                    } else {
+                        List {
                         Section {
                             Picker("Metric", selection: $metricMode) {
                                 Text("Heart Rate").tag(HistoryMetric.heartRate)
@@ -235,7 +245,7 @@ struct HistoryView: View {
                                     withAnimation(.easeInOut) {
                                         monthOffset -= 1
                                         selectedDay = nil
-                                        visibleCount = min(visibleCount, filteredMeasurements.count)
+                                        updateVisibleCountForFilter(resetToFirstPage: true)
                                     }
                                 } label: {
                                     Image(systemName: "chevron.left")
@@ -253,7 +263,7 @@ struct HistoryView: View {
                                     withAnimation(.easeInOut) {
                                         monthOffset = min(0, monthOffset + 1)
                                         selectedDay = nil
-                                        visibleCount = min(visibleCount, filteredMeasurements.count)
+                                        updateVisibleCountForFilter(resetToFirstPage: true)
                                     }
                                 } label: {
                                     Image(systemName: "chevron.right")
@@ -325,27 +335,21 @@ struct HistoryView: View {
                                         }
                                     }
                                 }
+                                .onAppear {
+                                    loadMoreIfNeeded(currentItem: entry)
+                                }
                             }
                             .onDelete { offsets in
-                                let sortedFiltered = filteredMeasurements.sorted { $0.date > $1.date }
-                                let toDelete = Set(offsets.map { sortedFiltered[$0].id })
+                                let toDelete = Set(offsets.map { pagedLog[$0].id })
                                 vm.deleteEntries(ids: toDelete)
-                                visibleCount = min(visibleCount, filteredMeasurements.count)
+                                updateVisibleCountForFilter()
                             }
 
-                            if hasMore {
-                                Button {
-                                    visibleCount = min(visibleCount + 5, filteredMeasurements.count)
-                                } label: {
-                                    HStack {
-                                        Spacer()
-                                        Text("Show more")
-                                            .fontWeight(.semibold)
-                                        Spacer()
-                                    }
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .tint(.red)
+                            if pagedLog.isEmpty {
+                                Text("No measurements in this period.")
+                                    .foregroundStyle(.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .center)
+                                    .padding(.vertical, 12)
                             }
                         } header: {
                             HStack {
@@ -368,7 +372,7 @@ struct HistoryView: View {
                                         vm.deleteEntries(ids: selectedEntries)
                                         isSelectionMode = false
                                         selectedEntries.removeAll()
-                                        visibleCount = min(visibleCount, filteredMeasurements.count)
+                                        updateVisibleCountForFilter()
                                     }
                                     .foregroundColor(.red)
                                     .disabled(selectedEntries.isEmpty)
@@ -382,20 +386,23 @@ struct HistoryView: View {
                         }
                         .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
                     }
+                    .scrollContentBackground(.hidden)
                 }
             }
             .navigationTitle("Stats")
         }
         .onChange(of: vm.log) { _, _ in
-            visibleCount = min(max(5, visibleCount), filteredMeasurements.count)
+            updateVisibleCountForFilter()
             selectedEntries = selectedEntries.filter { id in vm.log.contains(where: { $0.id == id }) }
         }
         .onChange(of: metricMode) { _, _ in
             monthOffset = 0
             selectedDay = nil
-            visibleCount = min(visibleCount, filteredMeasurements.count)
+            updateVisibleCountForFilter(resetToFirstPage: true)
         }
     }
+}
+
 }
 
 private enum HistoryMetric: String, CaseIterable, Identifiable {
@@ -434,7 +441,33 @@ private extension HistoryView {
         } else {
             selectedDay = date
         }
-        visibleCount = min(max(5, visibleCount), filteredMeasurements.count)
+        updateVisibleCountForFilter(resetToFirstPage: true)
+    }
+
+    func updateVisibleCountForFilter(resetToFirstPage: Bool = false) {
+        let total = sortedFilteredMeasurements.count
+
+        guard total > 0 else {
+            visibleCount = 0
+            return
+        }
+
+        if resetToFirstPage || visibleCount == 0 {
+            visibleCount = min(pageSize, total)
+            return
+        }
+
+        visibleCount = min(max(pageSize, visibleCount), total)
+    }
+
+    func loadMoreIfNeeded(currentItem item: HeartRateEntry) {
+        guard hasMore else { return }
+        guard let index = pagedLog.firstIndex(where: { $0.id == item.id }) else { return }
+
+        let thresholdIndex = max(0, pagedLog.count - 4)
+        guard index >= thresholdIndex else { return }
+
+        visibleCount = min(visibleCount + pageSize, sortedFilteredMeasurements.count)
     }
 
     func dayLabel(for date: Date) -> String {

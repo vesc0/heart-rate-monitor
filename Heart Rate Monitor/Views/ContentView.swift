@@ -26,11 +26,17 @@ struct ContentView: View {
                 }
                 .tag(2)
 
-            ProfileView(vm: vm)
+            ProfileView()
                 .tabItem {
                     Label("Profile", systemImage: "person.crop.circle")
                 }
                 .tag(3)
+
+            SettingsView(vm: vm)
+                .tabItem {
+                    Label("Settings", systemImage: "gearshape")
+                }
+                .tag(4)
         }
         .environmentObject(auth)
         // Sync heart-rate data when auth state changes

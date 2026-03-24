@@ -10,6 +10,11 @@ import SwiftUI
 @main
 struct Heart_Rate_MonitorApp: App {
     @AppStorage("hasSeenWelcome") private var hasSeenWelcome = false
+    @AppStorage("appTheme") private var appThemeRawValue: String = AppTheme.system.rawValue
+
+    private var appTheme: AppTheme {
+        AppTheme(rawValue: appThemeRawValue) ?? .system
+    }
 
     var body: some Scene {
         WindowGroup {
@@ -22,7 +27,8 @@ struct Heart_Rate_MonitorApp: App {
                     }
                 }
             }
-                .tint(.red) // Global red accent/tint for tabs, controls, etc.
+            .tint(.red)
+            .preferredColorScheme(appTheme.colorScheme)
         }
     }
 }
