@@ -137,6 +137,10 @@ struct HistoryView: View {
         return monthDays.compactMap { dict[$0] }
     }
 
+    private var hasChartDataForCurrentPeriod: Bool {
+        dailyRangesForCurrentMonth.contains { $0.min != 0 || $0.max != 0 }
+    }
+
     private var monthStats: PeriodStats? {
         aggregateStats(for: dailyRangesForCurrentMonth)
     }
@@ -239,6 +243,7 @@ struct HistoryView: View {
                             }
                             .pickerStyle(.segmented)
                             .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
 
                             HStack {
                                 Button {
@@ -275,13 +280,20 @@ struct HistoryView: View {
                             .padding(.top, 4)
                             .listRowSeparator(.hidden)
 
-                            chartView()
-                                .frame(height: 240)
-                                .padding(.bottom, 6)
-                                .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
-                                .listRowSeparator(.hidden)
-                        } header: {
-                            Text(metricMode == .heartRate ? "Heart Rate (Monthly)" : "Stress (Monthly)")
+                            if hasChartDataForCurrentPeriod {
+                                chartView()
+                                    .frame(height: 240)
+                                    .padding(.bottom, 6)
+                                    .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
+                                    .listRowSeparator(.hidden)
+                            } else {
+                                Text("No data in this period.")
+                                    .foregroundStyle(.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .center)
+                                    .padding(.vertical, 24)
+                                    .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
+                                    .listRowSeparator(.hidden)
+                            }
                         } footer: {
                             if let stats = displayStats {
                                 VStack(spacing: 10) {
@@ -377,10 +389,12 @@ struct HistoryView: View {
                                     .foregroundColor(.red)
                                     .disabled(selectedEntries.isEmpty)
                                 } else {
-                                    Button("Select") {
-                                        isSelectionMode = true
+                                    if !filteredMeasurements.isEmpty {
+                                        Button("Select") {
+                                            isSelectionMode = true
+                                        }
+                                        .buttonStyle(.plain)
                                     }
-                                    .buttonStyle(.plain)
                                 }
                             }
                         }

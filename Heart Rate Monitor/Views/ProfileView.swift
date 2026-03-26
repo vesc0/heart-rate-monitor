@@ -1,7 +1,15 @@
 import SwiftUI
 
+enum ProfileUnitSystem: String, CaseIterable, Identifiable {
+    case metric
+    case imperial
+
+    var id: String { rawValue }
+}
+
 struct ProfileView: View {
     @EnvironmentObject private var auth: AuthViewModel
+    @AppStorage("profile.unitSystem") private var preferredUnitSystemRaw = ProfileUnitSystem.metric.rawValue
     @State private var showAuthSheet = false
     @State private var selectedAuthTab = 0 // 0 = Login, 1 = Sign Up
     @State private var editingField: EditableField? = nil
@@ -122,15 +130,19 @@ struct ProfileView: View {
                     Divider().padding(.leading, 48)
                     profileRow(icon: "calendar", label: "Age", value: auth.age ?? "", editable: .age)
                     Divider().padding(.leading, 48)
-                    profileRow(icon: "figure.stand", label: "Gender", value: auth.gender ?? "", editable: .gender)
+                    profileRow(icon: "figure.stand", label: "Gender", value: (auth.gender ?? "").capitalized, editable: .gender)
                     Divider().padding(.leading, 48)
-                    profileRow(icon: "ruler", label: "Height (cm)", value: auth.heightCm ?? "", editable: .height)
+                    profileRow(icon: "ruler", label: "Height", value: displayedHeight, editable: .height)
                     Divider().padding(.leading, 48)
-                    profileRow(icon: "scalemass", label: "Weight (kg)", value: auth.weightKg ?? "", editable: .weight)
+                    profileRow(icon: "scalemass", label: "Weight", value: displayedWeight, editable: .weight)
                     Divider().padding(.leading, 48)
                     profileRow(icon: "heart.text.clipboard", label: "Health", value: auth.healthIssues ?? "", editable: .health)
                 }
-                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+                )
             }
 
             if let err = profileError {
@@ -154,10 +166,19 @@ struct ProfileView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
-                .background(Color.red.opacity(0.1), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .foregroundStyle(Color.red.opacity(0.9))
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Color.red.opacity(0.08))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .stroke(Color.red.opacity(0.22), lineWidth: 1)
+                        )
+                )
             }
             .buttonStyle(.plain)
             .padding(.top, 8)
+            .padding(.bottom, 32)
         }
         .padding(.horizontal)
         .frame(maxWidth: 520)
@@ -208,6 +229,10 @@ struct ProfileView: View {
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .fill(Color(.secondarySystemGroupedBackground))
         )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+        )
     }
 
     // MARK: - Profile Row
@@ -218,10 +243,14 @@ struct ProfileView: View {
             editingField = editable
         } label: {
             HStack(spacing: 12) {
-                Image(systemName: icon)
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(.red)
-                    .frame(width: 28)
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color.red.opacity(0.12))
+                    Image(systemName: icon)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.red)
+                }
+                .frame(width: 32, height: 32)
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text(label)
@@ -247,6 +276,30 @@ struct ProfileView: View {
     }
     
     // MARK: - Profile helpers
+
+    private var preferredUnitSystem: ProfileUnitSystem {
+        ProfileUnitSystem(rawValue: preferredUnitSystemRaw) ?? .metric
+    }
+
+    private var displayedHeight: String {
+        guard let cm = Int(auth.heightCm ?? "") else { return "" }
+        if preferredUnitSystem == .metric {
+            return "\(cm) cm"
+        }
+        let totalInches = Int((Double(cm) / 2.54).rounded())
+        let feet = totalInches / 12
+        let inches = totalInches % 12
+        return "\(feet) ft \(inches) in"
+    }
+
+    private var displayedWeight: String {
+        guard let kg = Int(auth.weightKg ?? "") else { return "" }
+        if preferredUnitSystem == .metric {
+            return "\(kg) kg"
+        }
+        let lb = Int((Double(kg) * 2.2046226218).rounded())
+        return "\(lb) lb"
+    }
 
     private func currentValue(for field: EditableField) -> String {
         switch field {
@@ -334,23 +387,34 @@ struct EditFieldSheet: View {
     var onCancel: () -> Void
 
     @State private var draft: String = ""
+    @State private var numericValue: Int = 0
+    @State private var heightFeet: Int = 5
+    @State private var heightInches: Int = 7
+    @State private var selectedGender: String = "other"
+    @State private var unitSystem: ProfileUnitSystem = .metric
+    @State private var previousUnitSystem: ProfileUnitSystem = .metric
+    @State private var isInitializing = false
+    @AppStorage("profile.unitSystem") private var preferredUnitSystemRaw = ProfileUnitSystem.metric.rawValue
     @FocusState private var textFocused: Bool
 
     var body: some View {
         NavigationStack {
-            Form {
-                TextField(fieldName, text: $draft)
-                    .focused($textFocused)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
+            VStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 8) {
+                    fieldEditor
+                }
+                Spacer(minLength: 0)
             }
+            .padding()
+            .background(Color(.systemGroupedBackground).ignoresSafeArea())
             .navigationTitle("Edit \(fieldName)")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
-                        onSave(draft)
+                        onSave(saveValue)
                     }
                     .fontWeight(.bold)
+                    .disabled(!canSave)
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -360,18 +424,341 @@ struct EditFieldSheet: View {
             }
             .onAppear {
                 draft = initialValue
-                textFocused = true
+                initializeState()
             }
         }
     }
+
+    @ViewBuilder
+    private var fieldEditor: some View {
+        switch field {
+        case .age:
+            wheelEditor(
+                valueText: "\(numericValue) years",
+                selection: $numericValue,
+                values: Array(1...130)
+            )
+        case .height:
+            VStack(alignment: .leading, spacing: 10) {
+                unitPicker
+                heightWheelEditor(valueText: heightDisplay)
+            }
+        case .weight:
+            VStack(alignment: .leading, spacing: 10) {
+                unitPicker
+                weightWheelEditor(
+                    valueText: weightDisplay,
+                    selection: $numericValue
+                )
+            }
+        case .gender:
+            Picker("Gender", selection: $selectedGender) {
+                Text("Male").tag("male")
+                Text("Female").tag("female")
+                Text("Other").tag("other")
+            }
+            .pickerStyle(.segmented)
+            .padding(10)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color(.secondarySystemBackground))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+            )
+        default:
+            TextField(fieldName, text: $draft, axis: field == .health ? .vertical : .horizontal)
+                .focused($textFocused)
+                .textInputAutocapitalization(autocapitalization)
+                .keyboardType(keyboardType)
+                .autocorrectionDisabled(field != .name)
+                .lineLimit(field == .health ? 6 : 1)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Color(.secondarySystemBackground))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                )
+        }
+    }
+
+    private var unitPicker: some View {
+        Picker("Units", selection: $unitSystem) {
+            ForEach(ProfileUnitSystem.allCases) { unit in
+                Text(unit == .metric ? "Metric" : "Imperial")
+                    .tag(unit)
+            }
+        }
+        .pickerStyle(.segmented)
+        .onChange(of: unitSystem) { _, newUnit in
+            guard !isInitializing else { return }
+            guard newUnit != previousUnitSystem else { return }
+            preferredUnitSystemRaw = newUnit.rawValue
+            // Keep the represented value equivalent while toggling units.
+            if field == .height {
+                if newUnit == .imperial {
+                    syncImperialHeightFromMetricCm(numericValue)
+                } else {
+                    numericValue = clamped(metricCmFromImperialHeight, to: heightRange)
+                }
+            } else if field == .weight {
+                let converted = newUnit == .metric
+                    ? (Double(numericValue) / 2.2046226218)
+                    : (Double(numericValue) * 2.2046226218)
+                numericValue = clamped(Int(converted.rounded()), to: weightRange)
+            }
+            previousUnitSystem = newUnit
+        }
+    }
+
+    private func wheelEditor(valueText: String, selection: Binding<Int>, values: [Int]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(valueText)
+                .font(.headline)
+
+            Picker("", selection: selection) {
+                ForEach(values, id: \.self) { value in
+                    Text("\(value)")
+                        .tag(value)
+                }
+            }
+            .pickerStyle(.wheel)
+            .frame(maxWidth: .infinity)
+            .frame(height: 140)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color(.secondarySystemBackground))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+        )
+    }
+
+    private func heightWheelEditor(valueText: String) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(valueText)
+                .font(.headline)
+
+            if unitSystem == .metric {
+                Picker("", selection: $numericValue) {
+                    ForEach(Array(heightRange), id: \.self) { value in
+                        Text("\(value) cm").tag(value)
+                    }
+                }
+                .pickerStyle(.wheel)
+                .frame(maxWidth: .infinity)
+                .frame(height: 160)
+            } else {
+                HStack(spacing: 0) {
+                    Picker("Feet", selection: $heightFeet) {
+                        ForEach(1...8, id: \.self) { value in
+                            Text("\(value) ft").tag(value)
+                        }
+                    }
+                    .pickerStyle(.wheel)
+                    .frame(maxWidth: .infinity)
+
+                    Picker("Inches", selection: $heightInches) {
+                        ForEach(0...11, id: \.self) { value in
+                            Text("\(value) in").tag(value)
+                        }
+                    }
+                    .pickerStyle(.wheel)
+                    .frame(maxWidth: .infinity)
+                }
+                .frame(height: 160)
+                .onChange(of: heightFeet) { _, _ in
+                    clampImperialHeightSelection()
+                }
+                .onChange(of: heightInches) { _, _ in
+                    clampImperialHeightSelection()
+                }
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color(.secondarySystemBackground))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+        )
+    }
+
+    private func weightWheelEditor(valueText: String, selection: Binding<Int>) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(valueText)
+                .font(.headline)
+
+            Picker("", selection: selection) {
+                ForEach(Array(weightRange), id: \.self) { value in
+                    Text(unitSystem == .metric ? "\(value) kg" : "\(value) lb")
+                        .tag(value)
+                }
+            }
+            .pickerStyle(.wheel)
+            .frame(maxWidth: .infinity)
+            .frame(height: 160)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color(.secondarySystemBackground))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+        )
+    }
+
+    private func initializeState() {
+        isInitializing = true
+        unitSystem = ProfileUnitSystem(rawValue: preferredUnitSystemRaw) ?? .metric
+        previousUnitSystem = unitSystem
+        switch field {
+        case .age:
+            numericValue = clamped(Int(initialValue) ?? 30, to: 1...130)
+        case .height:
+            let metricCm = clamped(Int(initialValue) ?? 170, to: 50...250)
+            if unitSystem == .metric {
+                numericValue = metricCm
+            } else {
+                syncImperialHeightFromMetricCm(metricCm)
+            }
+        case .weight:
+            let metricKg = clamped(Int(initialValue) ?? 70, to: 20...300)
+            if unitSystem == .metric {
+                numericValue = metricKg
+            } else {
+                let lb = Int((Double(metricKg) * 2.2046226218).rounded())
+                numericValue = clamped(lb, to: weightRange)
+            }
+        case .gender:
+            let normalized = initialValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            selectedGender = ["male", "female", "other"].contains(normalized) ? normalized : "other"
+        default:
+            textFocused = true
+        }
+        preferredUnitSystemRaw = unitSystem.rawValue
+        isInitializing = false
+    }
+
+    private var saveValue: String {
+        switch field {
+        case .age:
+            return String(numericValue)
+        case .height:
+            let cm = unitSystem == .metric ? Double(numericValue) : (Double(metricCmFromImperialHeight))
+            return String(Int(cm.rounded()))
+        case .weight:
+            let kg = unitSystem == .metric ? Double(numericValue) : (Double(numericValue) / 2.2046226218)
+            return String(Int(kg.rounded()))
+        case .gender:
+            return selectedGender
+        default:
+            return trimmedDraft
+        }
+    }
+
+    private var canSave: Bool {
+        switch field {
+        case .age, .height, .weight, .gender:
+            return true
+        default:
+            return !trimmedDraft.isEmpty
+        }
+    }
+
+    private var heightDisplay: String {
+        if unitSystem == .metric {
+            return "\(numericValue) cm"
+        }
+        return "\(heightFeet) ft \(heightInches) in"
+    }
+
+    private var weightDisplay: String {
+        if unitSystem == .metric {
+            return "\(numericValue) kg"
+        }
+        return "\(numericValue) lb"
+    }
+
+    private var heightRange: ClosedRange<Int> {
+        unitSystem == .metric ? 50...250 : 20...98
+    }
+
+    private var weightRange: ClosedRange<Int> {
+        unitSystem == .metric ? 20...300 : 44...661
+    }
+
+    private func clamped(_ value: Int, to range: ClosedRange<Int>) -> Int {
+        min(max(value, range.lowerBound), range.upperBound)
+    }
+
+    private var metricCmFromImperialHeight: Int {
+        let totalInches = (heightFeet * 12) + heightInches
+        let clampedInches = clamped(totalInches, to: 20...98)
+        return Int((Double(clampedInches) * 2.54).rounded())
+    }
+
+    private func syncImperialHeightFromMetricCm(_ cm: Int) {
+        let inches = clamped(Int((Double(cm) / 2.54).rounded()), to: 20...98)
+        heightFeet = inches / 12
+        heightInches = inches % 12
+    }
+
+    private func clampImperialHeightSelection() {
+        let inches = clamped((heightFeet * 12) + heightInches, to: 20...98)
+        heightFeet = inches / 12
+        heightInches = inches % 12
+    }
+
+    private var trimmedDraft: String {
+        draft.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var keyboardType: UIKeyboardType {
+        switch field {
+        case .email:
+            return .emailAddress
+        case .age, .height, .weight:
+            return .numberPad
+        default:
+            return .default
+        }
+    }
+
+    private var autocapitalization: TextInputAutocapitalization {
+        switch field {
+        case .name:
+            return .words
+        case .health:
+            return .sentences
+        default:
+            return .never
+        }
+    }
+
     private var fieldName: String {
         switch field {
         case .name:   return "Name"
         case .email:  return "Email"
         case .age:    return "Age"
         case .gender: return "Gender"
-        case .height: return "Height (cm)"
-        case .weight: return "Weight (kg)"
+        case .height: return "Height"
+        case .weight: return "Weight"
         case .health: return "Health Issues"
         }
     }

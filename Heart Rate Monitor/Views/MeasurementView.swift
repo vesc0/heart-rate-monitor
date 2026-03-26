@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 enum MeasurementCategory: String, CaseIterable, Identifiable {
     case heartRate = "Heart Rate"
@@ -14,15 +15,16 @@ enum MeasurementCategory: String, CaseIterable, Identifiable {
 }
 
 enum HeartRateMode: String, CaseIterable, Identifiable {
-    case manual = "Manual"
-    case automatic = "Automatic"
+    case tap = "Tap"
+    case camera = "Camera"
     var id: String { rawValue }
 }
 
 struct MeasurementView: View {
     @ObservedObject var vm: HeartRateViewModel
+    @Environment(\.colorScheme) private var colorScheme
     @State private var category: MeasurementCategory = .heartRate
-    @State private var heartRateMode: HeartRateMode = .automatic
+    @State private var heartRateMode: HeartRateMode = .camera
 
     var body: some View {
         NavigationStack {
@@ -37,26 +39,26 @@ struct MeasurementView: View {
                 .padding(.top, 8)
                 .padding(.bottom, 4)
 
-                if category == .heartRate {
-                    Picker("Heart Rate Mode", selection: $heartRateMode) {
-                        ForEach(HeartRateMode.allCases) { item in
-                            Text(item.rawValue).tag(item)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .padding(.horizontal)
-                    .padding(.bottom, 4)
-                }
-
                 // Measurement content
                 Group {
                     switch category {
                     case .heartRate:
-                        switch heartRateMode {
-                        case .manual:
-                            ManualContentView(vm: vm)
-                        case .automatic:
-                            AutoContentView(vm: vm)
+                        VStack(spacing: 0) {
+                            TabView(selection: $heartRateMode) {
+                                TapContentView(vm: vm)
+                                    .tag(HeartRateMode.tap)
+
+                                CameraContentView(vm: vm)
+                                    .tag(HeartRateMode.camera)
+                            }
+                            .tabViewStyle(.page(indexDisplayMode: .always))
+                            .indexViewStyle(.page(backgroundDisplayMode: .always))
+                            .onAppear {
+                                applyPageIndicatorColors()
+                            }
+                            .onChange(of: colorScheme) { _, _ in
+                                applyPageIndicatorColors()
+                            }
                         }
                     case .stress:
                         StressContentView(vm: vm)
@@ -67,9 +69,19 @@ struct MeasurementView: View {
             .navigationTitle("Measure")
         }
     }
+
+    private func applyPageIndicatorColors() {
+        if colorScheme == .light {
+            UIPageControl.appearance().currentPageIndicatorTintColor = .systemRed
+            UIPageControl.appearance().pageIndicatorTintColor = UIColor.systemGray3.withAlphaComponent(0.65)
+        } else {
+            UIPageControl.appearance().currentPageIndicatorTintColor = .systemRed
+            UIPageControl.appearance().pageIndicatorTintColor = UIColor.white.withAlphaComponent(0.35)
+        }
+    }
 }
 
-// MARK: - Stress Measurement Content (moved from Stress tab)
+// MARK: - Stress Measurement Content
 
 private struct StressContentView: View {
     @ObservedObject var vm: HeartRateViewModel
@@ -188,12 +200,8 @@ private struct StressContentView: View {
                         Button {
                             stressVM.phase = .idle
                         } label: {
-                            Text("Done")
-                                .fontWeight(.semibold)
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(.red, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                                .foregroundColor(.white)
+                            Label("Done", systemImage: "checkmark")
+                                .measurementPrimaryButtonStyle()
                         }
                         .buttonStyle(.plain)
                         .padding(.horizontal, 64)
@@ -253,9 +261,9 @@ private struct StressContentView: View {
     }
 }
 
-// MARK: - Manual Measurement Content (extracted from ManualView)
+// MARK: - Tap Measurement Content
 
-private struct ManualContentView: View {
+private struct TapContentView: View {
     @ObservedObject var vm: HeartRateViewModel
 
     private var totalForCurrentPhase: Int {
@@ -275,7 +283,7 @@ private struct ManualContentView: View {
                         .foregroundStyle(.red.opacity(0.8))
                         .padding(.bottom, 4)
 
-                    Text("Manual Measurement")
+                    Text("Tap Measurement")
                         .font(.title2)
                         .fontWeight(.bold)
 
@@ -287,7 +295,7 @@ private struct ManualContentView: View {
                     Button {
                         vm.startSession()
                     } label: {
-                        Label("Start Manual Session", systemImage: "play.fill")
+                        Label("Start Tap Session", systemImage: "play.fill")
                             .measurementPrimaryButtonStyle()
                     }
                     .buttonStyle(.plain)
@@ -366,9 +374,9 @@ private struct ManualContentView: View {
     }
 }
 
-// MARK: - Automatic Measurement Content (extracted from AutoView)
+// MARK: - Camera Measurement Content
 
-private struct AutoContentView: View {
+private struct CameraContentView: View {
     @ObservedObject var vm: HeartRateViewModel
     @StateObject private var autoVM = AutoHeartRateViewModel()
 
@@ -406,7 +414,7 @@ private struct AutoContentView: View {
                             .foregroundStyle(.red.opacity(0.8))
                             .padding(.bottom, 4)
 
-                        Text("Automatic Measurement")
+                        Text("Camera Measurement")
                             .font(.title2)
                             .fontWeight(.bold)
 
@@ -418,7 +426,7 @@ private struct AutoContentView: View {
                         Button {
                             autoVM.startSession()
                         } label: {
-                            Label("Start Automatic Session", systemImage: "play.fill")
+                            Label("Start Camera Session", systemImage: "play.fill")
                                 .measurementPrimaryButtonStyle()
                         }
                         .buttonStyle(.plain)
@@ -499,7 +507,7 @@ private struct AutoContentView: View {
                         .tint(.red)
                     }
                 }
-                .padding(.bottom, 20)
+                .padding(.bottom, 44)
             }
         }
         // When session ends, save to shared history

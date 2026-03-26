@@ -1,6 +1,8 @@
 # Heart Rate Monitor
 
-An iOS app for measuring heart rate — either manually by tapping, or automatically using the camera + flash.
+An iOS app for measuring:
+- Heart Rate — manually by tapping, or automatically using the camera + flash.
+- Stress — using the camera + flash.
 
 ## Disclaimer
 
@@ -17,20 +19,22 @@ This is not a medical app. It is intended for entertainment and educational purp
 
 ##  Features
 
-- **Manual Mode**: Tap along with your pulse to record your heart rate.
-- **Automatic Mode**: Place your finger over the main back camera. The app detects your pulse by analyzing subtle color changes.
-- **History**: View your past sessions, delete entries, see your average heart rate, and weekly/monthly trends.
-- **Profile**: Log in or sign up to save your measurements, and edit profile.
+- **Manual Mode**: Tap in rhythm with your pulse to record heart rate.
+- **Automatic Mode**: Place your finger over the rear camera. The app detects your pulse by analyzing subtle color changes.
+- **Stress**: Place your finger over the rear camera. The app sends HRV-related data to the API, where an ML model performs real-time inference.
+- **Stats**: View your past sessions, delete entries, see your average heart rate and stress level, and monthly trends.
+- **Profile**: Log in or sign up to save measurements and edit personal data.
 
 ##  Tech Stack
 
 - **SwiftUI + MVVM**: Clean separation of UI (`Views`) and logic (`ViewModels`).
+- **Auth + Profile Sync**: Profile data is fetched and updated through the app API.
 - **Persistence**: Uses `UserDefaults` with `Codable`, saving results across app launches.
 - **Auto Mode**:
   - Uses `AVCaptureSession` for real-time camera capture.
   - Processes pixel data to estimate heart rate via red-channel intensity.
   - Enables flash/torch to enhance measurement accuracy.
-- Built with **Xcode**. No third-party dependencies.
+- Built with **Xcode**. The iOS app uses Apple frameworks only.
 
 ##  Getting Started
 
@@ -51,49 +55,86 @@ open "Heart Rate Monitor.xcodeproj"
 
 ##  Usage
 
-1. Select **Manual** tab — tap “Start Manual Session”, then tap the heart icon in rhythm with your pulse.
-2. Select **Automatic** tab — tap “Start Automatic Session”, cover the rear main camera lens, and wait a few seconds. The app will prompt for camera permission the first time you start an automatic session, so make sure to allow it.
-3. View results in **History** tab — swipe to delete a single entry, or select and delete multiple entries. View your average heart rate. View a graph with weekly or monthly trends.
-4. Log In or Sign up in **Profile** tab, view and edit Profile info, Log Out.
+1. On the **Welcome** screen, the app prompts for camera permission on first use.
+2. Select the **Measure** tab, then choose **Heart Rate** or **Stress**.
+3. In **Heart Rate**, choose **Tap** or **Camera** mode:
+  - Tap: tap “Start Tap Session”, then tap the heart icon in rhythm with your pulse.
+  - Camera: tap “Start Camera Session”, cover the rear camera lens, and wait a few seconds.
+4. In **Stress**, tap “Start Stress Session”, keep your finger on the camera for 60 seconds, and view the prediction.
+5. View results in **Stats** — delete entries, check average heart rate and stress level, and view monthly trends.
+6. Log in or sign up in **Profile**, then manage your profile details.
+7. In **Settings**, you can change the app theme color and configure saving to Apple Health.
 
 ##  Project Architecture
 
+```text
+Heart Rate Monitor/
+├── Heart Rate Monitor/
+│   ├── Models/
+│   │   ├── HeartRateEntry.swift
+│   │   └── SessionPhase.swift
+│   ├── Services/
+│   │   ├── APIService.swift
+│   │   └── HealthKitService.swift
+│   ├── ViewModels/
+│   │   ├── AuthViewModel.swift
+│   │   ├── AutoHeartRateViewModel.swift
+│   │   ├── HeartRateViewModel.swift
+│   │   └── StressViewModel.swift
+│   ├── Views/
+│   │   ├── CameraPreview.swift
+│   │   ├── ContentView.swift
+│   │   ├── MeasurementView.swift
+│   │   ├── HeartTimerView.swift
+│   │   ├── HistoryView.swift
+│   │   ├── LoginView.swift
+│   │   ├── ProfileView.swift
+│   │   ├── SettingsView.swift
+│   │   ├── SignUpView.swift
+│   │   ├── WelcomeView.swift
+│   │   └── ViewExtensions.swift
+├── Heart Rate Monitor.xcodeproj/
+├── Heart-Rate-Monitor-Info.plist
+├── README.md
+└── screenshots/
 ```
-HeartRateMonitor/
-├── Models/
-│   ├── HeartRateEntry.swift
-│   └── SessionPhase.swift
-├── Services/
-│   └── APIService.swift
-├── ViewModels/
-│   ├── AuthViewModel.swift
-│   ├── AutoHeartRateViewModel.swift
-│   └── HeartRateViewModel.swift
-├── Views/
-│   ├── AutoView.swift
-│   ├── CameraPreview.swift
-│   ├── ContentView.swift
-│   ├── HeartTimerView.swift
-│   ├── HistryView.swift
-│   ├── LoginView.swift
-│   ├── Manualview.swift
-│   ├── ProfileView.swift
-│   ├── SignUpView.swift
-│   └── ViewExtensions.swift
+
+### API Workspace
+
+If you want to run the backend locally, the API project is available here:
+
+```text
+https://github.com/vesc0/heart-rate-monitor-api
 ```
 
 ## Screenshots
 
 <p align="center">
-  <img src="screenshots/auto-mode.png" alt="auto-mode" width="300">
+  <img src="screenshots/welcome.png" alt="welcome" width="300">
 </p>
 
 <p align="center">
-  <img src="screenshots/manual-mode.png" alt="manual-mode" width="300">
+  <img src="screenshots/measurement-hr.png" alt="measurement-hr" width="300">
 </p>
 
 <p align="center">
-  <img src="screenshots/history.png" alt="history" width="300">
+  <img src="screenshots/hr-camera.png" alt="hr-camera" width="300">
+</p>
+
+<p align="center">
+  <img src="screenshots/measurement-stress.png" alt="measurement-stress" width="300">
+</p>
+
+<p align="center">
+  <img src="screenshots/stress-result.png" alt="stress-result" width="300">
+</p>
+
+<p align="center">
+  <img src="screenshots/stats-hr.png" alt="stats-hr" width="300">
+</p>
+
+<p align="center">
+  <img src="screenshots/stats-stress.png" alt="stats-stress" width="300">
 </p>
 
 <p align="center">
@@ -101,9 +142,9 @@ HeartRateMonitor/
 </p>
 
 <p align="center">
-  <img src="screenshots/signup.png" alt="signup" width="300">
+  <img src="screenshots/profile.png" alt="profile" width="300">
 </p>
 
 <p align="center">
-  <img src="screenshots/profile.png" alt="profile" width="300">
+  <img src="screenshots/settings.png" alt="settings" width="300">
 </p>
