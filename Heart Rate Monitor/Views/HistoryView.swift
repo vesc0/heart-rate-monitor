@@ -320,8 +320,17 @@ struct HistoryView: View {
                                     }
 
                                     VStack(alignment: .leading, spacing: 2) {
-                                        Text("\(entry.bpm) BPM")
-                                            .fontWeight(.semibold)
+                                        HStack(alignment: .firstTextBaseline, spacing: 4) {
+                                            Image(systemName: "heart.fill")
+                                                .font(.subheadline.weight(.bold))
+                                                .foregroundStyle(.red)
+                                            Text("\(entry.bpm)")
+                                                .font(.title2.weight(.black))
+                                                .foregroundStyle(heartRateValueColor(for: entry.bpm))
+                                            Text("BPM")
+                                                .font(.subheadline.weight(.semibold))
+                                                .foregroundStyle(.secondary)
+                                        }
                                         if let stress = entry.stressLevel {
                                             Text(stressDisplayText(for: stress))
                                                 .font(.caption)
@@ -331,12 +340,31 @@ struct HistoryView: View {
                                     }
                                     Spacer(minLength: 8)
                                     VStack(alignment: .trailing, spacing: 2) {
-                                        Text(entry.date, format: .dateTime.month(.abbreviated).day().year())
-                                        Text(entry.date, style: .time)
-                                            .foregroundColor(.gray)
-                                            .font(.caption)
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "calendar")
+                                                .foregroundStyle(.secondary)
+                                            Text(entry.date, format: .dateTime.month(.abbreviated).day().year())
+                                        }
+                                        .font(.caption)
+
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "clock")
+                                                .foregroundStyle(.secondary)
+                                            Text(entry.date, style: .time)
+                                        }
+                                        .font(.caption)
+                                        .foregroundColor(.gray)
                                     }
                                 }
+                                .padding(.vertical, 14)
+                                .padding(.horizontal, 24)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .frame(minHeight: 84)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .fill(heartRateBackgroundColor(for: entry.bpm))
+                                )
+                                .listRowBackground(Color.clear)
                                 .contentShape(Rectangle())
                                 .onTapGesture {
                                     if isSelectionMode {
@@ -510,6 +538,25 @@ private extension HistoryView {
         return stress
     }
 
+    func heartRateBandColor(for bpm: Int) -> Color {
+        switch bpm {
+        case 60...100:
+            return .green
+        case 50...59, 101...110:
+            return .yellow
+        default:
+            return .red
+        }
+    }
+
+    func heartRateValueColor(for bpm: Int) -> Color {
+        heartRateBandColor(for: bpm)
+    }
+
+    func heartRateBackgroundColor(for bpm: Int) -> Color {
+        heartRateBandColor(for: bpm).opacity(0.14)
+    }
+
     var measurementsHeaderTitle: String {
         let df = DateFormatter()
         df.dateFormat = "LLLL yyyy"
@@ -532,25 +579,134 @@ private extension HistoryView {
         return left...rightPad
     }
 
+    @ChartContentBuilder
+    func chartBackgroundZones(_ yDomain: ClosedRange<Double>) -> some ChartContent {
+        switch metricMode {
+        case .heartRate:
+            let low = yDomain.lowerBound
+            let high = yDomain.upperBound
+
+            let lowRedStart = low
+            let lowRedEnd = min(50.0, high)
+            if lowRedEnd > lowRedStart {
+                RectangleMark(
+                    xStart: .value("Start", chartXDomain.lowerBound),
+                    xEnd: .value("End", chartXDomain.upperBound),
+                    yStart: .value("Low red", lowRedStart),
+                    yEnd: .value("Low red top", lowRedEnd)
+                )
+                .foregroundStyle(Color.red.opacity(0.14))
+            }
+
+            let lowYellowStart = max(50.0, low)
+            let lowYellowEnd = min(60.0, high)
+            if lowYellowEnd > lowYellowStart {
+                RectangleMark(
+                    xStart: .value("Start", chartXDomain.lowerBound),
+                    xEnd: .value("End", chartXDomain.upperBound),
+                    yStart: .value("Low yellow", lowYellowStart),
+                    yEnd: .value("Low yellow top", lowYellowEnd)
+                )
+                .foregroundStyle(Color.yellow.opacity(0.14))
+            }
+
+            let greenStart = max(60.0, low)
+            let greenEnd = min(100.0, high)
+            if greenEnd > greenStart {
+                RectangleMark(
+                    xStart: .value("Start", chartXDomain.lowerBound),
+                    xEnd: .value("End", chartXDomain.upperBound),
+                    yStart: .value("Green", greenStart),
+                    yEnd: .value("Green top", greenEnd)
+                )
+                .foregroundStyle(Color.green.opacity(0.14))
+            }
+
+            let highYellowStart = max(100.0, low)
+            let highYellowEnd = min(110.0, high)
+            if highYellowEnd > highYellowStart {
+                RectangleMark(
+                    xStart: .value("Start", chartXDomain.lowerBound),
+                    xEnd: .value("End", chartXDomain.upperBound),
+                    yStart: .value("High yellow", highYellowStart),
+                    yEnd: .value("High yellow top", highYellowEnd)
+                )
+                .foregroundStyle(Color.yellow.opacity(0.14))
+            }
+
+            let highRedStart = max(110.0, low)
+            let highRedEnd = high
+            if highRedEnd > highRedStart {
+                RectangleMark(
+                    xStart: .value("Start", chartXDomain.lowerBound),
+                    xEnd: .value("End", chartXDomain.upperBound),
+                    yStart: .value("High red", highRedStart),
+                    yEnd: .value("High red top", highRedEnd)
+                )
+                .foregroundStyle(Color.red.opacity(0.14))
+            }
+        case .stress:
+            RectangleMark(
+                xStart: .value("Start", chartXDomain.lowerBound),
+                xEnd: .value("End", chartXDomain.upperBound),
+                yStart: .value("Green", 0),
+                yEnd: .value("Green top", 40)
+            )
+            .foregroundStyle(Color.green.opacity(0.14))
+
+            RectangleMark(
+                xStart: .value("Start", chartXDomain.lowerBound),
+                xEnd: .value("End", chartXDomain.upperBound),
+                yStart: .value("Yellow", 40),
+                yEnd: .value("Yellow top", 70)
+            )
+            .foregroundStyle(Color.yellow.opacity(0.14))
+
+            RectangleMark(
+                xStart: .value("Start", chartXDomain.lowerBound),
+                xEnd: .value("End", chartXDomain.upperBound),
+                yStart: .value("Red", 70),
+                yEnd: .value("Red top", 100)
+            )
+            .foregroundStyle(Color.red.opacity(0.14))
+        }
+    }
+
     @ViewBuilder
     func chartView() -> some View {
         let baseData: [DailyMetricRange] = dailyRangesForCurrentMonth
         let chartData: [DailyMetricRange] = baseData.filter { $0.min != 0 || $0.max != 0 }
+        let minDataValue = Double(chartData.map(\.min).min() ?? 50)
+        let maxDataValue = Double(chartData.map(\.max).max() ?? 100)
 
-        Chart(chartData) { day in
-            ChartBar(
-                day: day,
-                isSelected: isSelected(day),
-                hasSelection: selectedDay != nil,
-                labelProvider: { dayLabel(for: day.day) }
-            )
+        let heartRateLower = floor((minDataValue - 6.0) / 5.0) * 5.0
+        let heartRateUpper = ceil((maxDataValue + 8.0) / 5.0) * 5.0
+        let heartRateDomain: ClosedRange<Double> = heartRateLower...max(heartRateUpper, heartRateLower + 10.0)
+        let stressDomain: ClosedRange<Double> = 0...100
+
+        Chart {
+            chartBackgroundZones(metricMode == .heartRate ? heartRateDomain : stressDomain)
+
+            ForEach(chartData) { day in
+                ChartBar(
+                    day: day,
+                    isSelected: isSelected(day),
+                    hasSelection: selectedDay != nil,
+                    labelProvider: { dayLabel(for: day.day) }
+                )
+            }
         }
         .chartXScale(domain: chartXDomain)
+        .chartYScale(domain: metricMode == .heartRate ? heartRateDomain : stressDomain)
         .chartXAxis {
             monthlyXAxis()
         }
         .chartYAxis {
             AxisMarks(position: .trailing)
+        }
+        .chartPlotStyle { plotArea in
+            plotArea
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
         .chartOverlay { proxy in
             GeometryReader { _ in
@@ -600,13 +756,36 @@ private extension HistoryView {
     func statPillLarge(title: String, value: Int) -> some View {
         VStack(spacing: 2) {
             Text(title.uppercased())
-                .font(.caption.weight(.semibold))
-            Text("\(value) \(valueUnitLabel)")
-                .font(.subheadline.weight(.semibold))
+                .font(.caption.weight(.bold))
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                Text("\(value)")
+                    .font(.title3.weight(.black))
+                    .monospacedDigit()
+                    .foregroundStyle(metricValueColor(for: value))
+                    .frame(width: 34, alignment: .trailing)
+                Text(valueUnitLabel)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 12)
-        .background(Color(.secondarySystemGroupedBackground), in: Capsule())
+        .padding(.vertical, 10)
+        .padding(.horizontal, 14)
+        .frame(width: 106)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color(.secondarySystemGroupedBackground))
+        )
+    }
+
+    func metricValueColor(for value: Int) -> Color {
+        switch metricMode {
+        case .heartRate:
+            return heartRateBandColor(for: value)
+        case .stress:
+            if value >= 70 { return .red }
+            if value >= 40 { return .yellow }
+            return .green
+        }
     }
 }
 
