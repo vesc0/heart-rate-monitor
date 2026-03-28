@@ -679,9 +679,11 @@ private extension HistoryView {
         let minDataValue = Double(chartData.map(\.min).min() ?? 50)
         let maxDataValue = Double(chartData.map(\.max).max() ?? 100)
 
-        let heartRateLower = floor((minDataValue - 6.0) / 5.0) * 5.0
-        let heartRateUpper = ceil((maxDataValue + 8.0) / 5.0) * 5.0
-        let heartRateDomain: ClosedRange<Double> = heartRateLower...max(heartRateUpper, heartRateLower + 10.0)
+        let heartRateLowerDynamic = floor((minDataValue - 6.0) / 5.0) * 5.0
+        let heartRateUpperDynamic = ceil((maxDataValue + 8.0) / 5.0) * 5.0
+        let heartRateLower = min(40.0, heartRateLowerDynamic)
+        let heartRateUpper = max(120.0, heartRateUpperDynamic)
+        let heartRateDomain: ClosedRange<Double> = heartRateLower...heartRateUpper
         let stressDomain: ClosedRange<Double> = 0...100
 
         Chart {
@@ -702,7 +704,11 @@ private extension HistoryView {
             monthlyXAxis()
         }
         .chartYAxis {
-            AxisMarks(position: .trailing)
+            if metricMode == .stress {
+                AxisMarks(position: .trailing, values: [0.0, 40.0, 70.0, 100.0])
+            } else {
+                AxisMarks(position: .trailing)
+            }
         }
         .chartPlotStyle { plotArea in
             plotArea
@@ -762,7 +768,7 @@ private extension HistoryView {
                     .font(.title3.weight(.black))
                     .monospacedDigit()
                     .foregroundStyle(metricValueColor(for: value))
-                    .frame(width: 34, alignment: .trailing)
+                    .frame(width: 42, alignment: .trailing)
                 Text(valueUnitLabel)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.secondary)
@@ -770,7 +776,7 @@ private extension HistoryView {
         }
         .padding(.vertical, 10)
         .padding(.horizontal, 14)
-        .frame(width: 106)
+        .frame(width: 116)
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(Color(.secondarySystemGroupedBackground))
