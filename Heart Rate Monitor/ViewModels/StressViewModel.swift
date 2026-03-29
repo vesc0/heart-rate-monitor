@@ -19,6 +19,7 @@ final class StressViewModel: NSObject, ObservableObject {
     @Published var heartScale: CGFloat  = 1.0
     @Published var canShowBPM: Bool     = false
     @Published var errorMessage: String?
+    @Published var flashUnavailableAlert: String?
 
     // Result populated after the API responds.
     @Published var stressResult: StressPredictResponse?
@@ -87,7 +88,7 @@ final class StressViewModel: NSObject, ObservableObject {
 
             DispatchQueue.main.async {
                 guard self.session.isRunning else { return }
-                self.turnTorch(on: true)
+                _ = self.turnTorch(on: true)
             }
         }
     }
@@ -393,17 +394,27 @@ final class StressViewModel: NSObject, ObservableObject {
         session.commitConfiguration()
     }
 
-    private func turnTorch(on: Bool) {
-        guard let dev = device, dev.hasTorch else { return }
+    @discardableResult
+    private func turnTorch(on: Bool) -> Bool {
+        guard let dev = device, dev.hasTorch else { return false }
         do {
             try dev.lockForConfiguration()
             if on {
                 try dev.setTorchModeOn(level: min(0.7, AVCaptureDevice.maxAvailableTorchLevel))
+                flashUnavailableAlert = nil
             } else {
                 dev.torchMode = .off
             }
             dev.unlockForConfiguration()
-        } catch { /* ignore torch errors */ }
+            return true
+        } catch {
+            if on {
+                // Flash/torch is unavailable, likely due to thermal constraints
+                flashUnavailableAlert = "Flash is unavailable. Your device may be too hot. Please let it cool down or move to a cooler environment."
+                errorMessage = "Flash is unavailable due to device temperature. Please cool down your device."
+            }
+            return false
+        }
     }
 
     private func cleanupCamera() {

@@ -209,12 +209,6 @@ private struct StressContentView: View {
                     .frame(maxHeight: .infinity, alignment: .center)
                 }
 
-                if let err = stressVM.errorMessage {
-                    Text(err)
-                        .foregroundColor(.red)
-                        .multilineTextAlignment(.center)
-                }
-
                 Spacer()
 
                 Group {
@@ -256,6 +250,16 @@ private struct StressContentView: View {
                     )
                     vm.updateEntry(updated)
                 }
+            }
+        }
+        .alert("Flash Unavailable", isPresented: .constant(stressVM.flashUnavailableAlert != nil)) {
+            Button("OK") {
+                stressVM.flashUnavailableAlert = nil
+                stressVM.stopSessionEarly()
+            }
+        } message: {
+            if let alert = stressVM.flashUnavailableAlert {
+                Text(alert)
             }
         }
     }
@@ -487,12 +491,6 @@ private struct CameraContentView: View {
                     .frame(maxHeight: .infinity, alignment: .center)
                 }
 
-                if let err = autoVM.errorMessage {
-                    Text(err)
-                        .foregroundColor(.red)
-                        .multilineTextAlignment(.center)
-                }
-
                 Spacer()
 
                 // Bottom-fixed stop button during measurement
@@ -515,6 +513,16 @@ private struct CameraContentView: View {
             if newPhase == .finished, let bpm = autoVM.currentBPM {
                 let entry = HeartRateEntry(bpm: bpm, date: Date())
                 vm.addEntry(entry)
+            }
+        }
+        .alert("Flash Unavailable", isPresented: .constant(autoVM.flashUnavailableAlert != nil)) {
+            Button("OK") {
+                autoVM.flashUnavailableAlert = nil
+                autoVM.stopSessionEarly()
+            }
+        } message: {
+            if let alert = autoVM.flashUnavailableAlert {
+                Text(alert)
             }
         }
     }

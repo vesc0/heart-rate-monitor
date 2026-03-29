@@ -17,6 +17,7 @@ final class AutoHeartRateViewModel: NSObject, ObservableObject {
     @Published var heartScale: CGFloat = 1.0
     @Published var errorMessage: String?
     @Published var canShowBPM: Bool = false
+    @Published var flashUnavailableAlert: String?
     
     // State
     private var stoppedEarly = false
@@ -71,7 +72,7 @@ final class AutoHeartRateViewModel: NSObject, ObservableObject {
             // Only turn on torch if session is actually running
             DispatchQueue.main.async {
                 guard self.session.isRunning else { return }
-                self.turnTorch(on: true)
+                _ = self.turnTorch(on: true)
                 // The 12s timer will start after calibration completes (4 valid beats).
             }
         }
@@ -228,19 +229,27 @@ final class AutoHeartRateViewModel: NSObject, ObservableObject {
         session.commitConfiguration()
     }
 
-    private func turnTorch(on: Bool) {
-        guard let dev = device, dev.hasTorch else { return }
+    @discardableResult
+    private func turnTorch(on: Bool) -> Bool {
+        guard let dev = device, dev.hasTorch else { return false }
         do {
             try dev.lockForConfiguration()
             if on {
                 // use a moderate level to reduce heat
                 try dev.setTorchModeOn(level: min(0.7, AVCaptureDevice.maxAvailableTorchLevel))
+                flashUnavailableAlert = nil
             } else {
                 dev.torchMode = .off
             }
             dev.unlockForConfiguration()
+            return true
         } catch {
-            // Ignore torch errors for now
+            if on {
+                // Flash/torch is unavailable, likely due to thermal constraints
+                flashUnavailableAlert = "Flash is unavailable. Your device may be too hot. Please let it cool down or move to a cooler environment."
+                errorMessage = "Flash is unavailable due to device temperature. Please cool down your device."
+            }
+            return false
         }
     }
 
