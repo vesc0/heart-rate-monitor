@@ -26,15 +26,23 @@ struct ProfileView: View {
                 Color(.systemGroupedBackground)
                     .ignoresSafeArea()
 
-                Group {
-                    if auth.isSignedIn {
-                        ScrollView {
-                            signedInContent
+                GeometryReader { proxy in
+                    ScrollView {
+                        Group {
+                            if auth.isSignedIn {
+                                signedInContent
+                            } else {
+                                signedOutContent
+                            }
                         }
-                        .scrollDismissesKeyboard(.interactively)
-                    } else {
-                        signedOutContent
+                        .frame(
+                            maxWidth: .infinity,
+                            minHeight: proxy.size.height,
+                            alignment: auth.isSignedIn ? .top : .center
+                        )
                     }
+                    .scrollDismissesKeyboard(.interactively)
+                    .scrollBounceBehavior(.always)
                 }
             }
             .id(auth.isSignedIn)
@@ -103,7 +111,7 @@ struct ProfileView: View {
             .buttonStyle(.plain)
             .padding(.horizontal, 40)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        .frame(maxWidth: .infinity, alignment: .center)
         .padding()
     }
 

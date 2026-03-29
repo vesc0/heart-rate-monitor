@@ -25,6 +25,7 @@ struct SettingsView: View {
     @State private var isExportingHistory = false
     @State private var healthExportMessage = ""
     @State private var showHealthExportAlert = false
+    @State private var showExportConfirmAlert = false
 
     var body: some View {
         NavigationStack {
@@ -53,7 +54,11 @@ struct SettingsView: View {
                     .tint(.red)
 
                     Button {
-                        exportHistoryToAppleHealth()
+                        if vm.log.isEmpty {
+                            exportHistoryToAppleHealth()
+                        } else {
+                            showExportConfirmAlert = true
+                        }
                     } label: {
                         HStack(spacing: 10) {
                             if isExportingHistory {
@@ -66,9 +71,9 @@ struct SettingsView: View {
                             }
 
                             VStack(alignment: .leading, spacing: 3) {
-                                Text("One-Time Sync Past History")
+                                Text("Sync Past History")
                                     .foregroundColor(.primary)
-                                Text("Export your existing app records into Apple Health.")
+                                Text("Export your existing records to Apple Health.")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -88,6 +93,14 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
+            .alert("Export History?", isPresented: $showExportConfirmAlert) {
+                Button("No", role: .cancel) {}
+                Button("Yes") {
+                    exportHistoryToAppleHealth()
+                }
+            } message: {
+                Text("This will export \(vm.log.count) records to Apple Health. Are you sure?")
+            }
             .alert("Apple Health Sync", isPresented: $showHealthExportAlert) {
                 Button("OK", role: .cancel) {}
             } message: {

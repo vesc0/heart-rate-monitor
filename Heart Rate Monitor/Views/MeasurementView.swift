@@ -23,8 +23,11 @@ enum HeartRateMode: String, CaseIterable, Identifiable {
 struct MeasurementView: View {
     @ObservedObject var vm: HeartRateViewModel
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.scenePhase) private var scenePhase
     @State private var category: MeasurementCategory = .heartRate
     @State private var heartRateMode: HeartRateMode = .camera
+    @StateObject private var autoVM = AutoHeartRateViewModel()
+    @StateObject private var stressVM = StressViewModel()
 
     var body: some View {
         NavigationStack {
@@ -45,10 +48,14 @@ struct MeasurementView: View {
                     case .heartRate:
                         VStack(spacing: 0) {
                             TabView(selection: $heartRateMode) {
-                                TapContentView(vm: vm)
+                                TapContentView(vm: vm) {
+                                    stopCameraMeasurementIfNeeded()
+                                }
                                     .tag(HeartRateMode.tap)
 
-                                CameraContentView(vm: vm)
+                                CameraContentView(vm: vm, autoVM: autoVM) {
+                                    stopTapMeasurementIfNeeded()
+                                }
                                     .tag(HeartRateMode.camera)
                             }
                             .tabViewStyle(.page(indexDisplayMode: .always))
@@ -59,14 +66,40 @@ struct MeasurementView: View {
                             .onChange(of: colorScheme) { _, _ in
                                 applyPageIndicatorColors()
                             }
+                            .onChange(of: heartRateMode) { _, newMode in
+                                switch newMode {
+                                case .tap:
+                                    stopCameraMeasurementIfNeeded()
+                                case .camera:
+                                    stopTapMeasurementIfNeeded()
+                                }
+                            }
                         }
                     case .stress:
-                        StressContentView(vm: vm)
+                        StressContentView(vm: vm, stressVM: stressVM) {
+                            stopHeartRateMeasurementsIfNeeded()
+                        }
                     }
                 }
                 .frame(maxHeight: .infinity)
             }
             .navigationTitle("Measure")
+            .onChange(of: category) { _, newCategory in
+                switch newCategory {
+                case .heartRate:
+                    stopStressMeasurementIfNeeded()
+                case .stress:
+                    stopHeartRateMeasurementsIfNeeded()
+                }
+            }
+            .onChange(of: scenePhase) { _, newPhase in
+                if newPhase != .active {
+                    stopAllMeasurementsIfNeeded()
+                }
+            }
+            .onDisappear {
+                stopAllMeasurementsIfNeeded()
+            }
         }
     }
 
@@ -79,6 +112,34 @@ struct MeasurementView: View {
             UIPageControl.appearance().pageIndicatorTintColor = UIColor.white.withAlphaComponent(0.35)
         }
     }
+
+    private func stopTapMeasurementIfNeeded() {
+        if vm.phase == .measuring {
+            vm.stopSession()
+        }
+    }
+
+    private func stopCameraMeasurementIfNeeded() {
+        if autoVM.phase == .measuring {
+            autoVM.stopSessionEarly()
+        }
+    }
+
+    private func stopStressMeasurementIfNeeded() {
+        if stressVM.phase == .measuring {
+            stressVM.stopSessionEarly()
+        }
+    }
+
+    private func stopHeartRateMeasurementsIfNeeded() {
+        stopTapMeasurementIfNeeded()
+        stopCameraMeasurementIfNeeded()
+    }
+
+    private func stopAllMeasurementsIfNeeded() {
+        stopHeartRateMeasurementsIfNeeded()
+        stopStressMeasurementIfNeeded()
+    }
 }
 
 // MARK: - Stress Measurement Content
@@ -86,7 +147,8 @@ struct MeasurementView: View {
 private struct StressContentView: View {
     @ObservedObject var vm: HeartRateViewModel
     @EnvironmentObject private var auth: AuthViewModel
-    @StateObject private var stressVM = StressViewModel()
+    @ObservedObject var stressVM: StressViewModel
+    let onStart: () -> Void
 
     private var totalForCurrentPhase: Int {
         switch stressVM.phase {
@@ -131,6 +193,7 @@ private struct StressContentView: View {
                             .padding(.horizontal)
 
                         Button {
+                            onStart()
                             stressVM.userAge = auth.age.flatMap { Int($0) }
                             stressVM.userGender = auth.gender
                             stressVM.userHeightCm = auth.heightCm.flatMap { Int($0) }
@@ -269,6 +332,7 @@ private struct StressContentView: View {
 
 private struct TapContentView: View {
     @ObservedObject var vm: HeartRateViewModel
+    let onStart: () -> Void
 
     private var totalForCurrentPhase: Int {
         switch vm.phase {
@@ -297,6 +361,7 @@ private struct TapContentView: View {
                         .padding(.horizontal)
 
                     Button {
+                        onStart()
                         vm.startSession()
                     } label: {
                         Label("Start Tap Session", systemImage: "play.fill")
@@ -382,7 +447,8 @@ private struct TapContentView: View {
 
 private struct CameraContentView: View {
     @ObservedObject var vm: HeartRateViewModel
-    @StateObject private var autoVM = AutoHeartRateViewModel()
+    @ObservedObject var autoVM: AutoHeartRateViewModel
+    let onStart: () -> Void
 
     private var totalForCurrentPhase: Int {
         switch autoVM.phase {
@@ -428,6 +494,7 @@ private struct CameraContentView: View {
                             .padding(.horizontal)
 
                         Button {
+                            onStart()
                             autoVM.startSession()
                         } label: {
                             Label("Start Camera Session", systemImage: "play.fill")

@@ -215,25 +215,31 @@ struct HistoryView: View {
 
                 Group {
                     if vm.log.isEmpty {
-                        VStack(spacing: 8) {
-                            Text("No Records")
-                                .font(.title2)
-                                .foregroundColor(.secondary)
-                            Text("Records will appear here after you complete a measurement.")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal)
+                        GeometryReader { proxy in
+                            ScrollView {
+                                VStack(spacing: 8) {
+                                    Text("No Records")
+                                        .font(.title2)
+                                        .foregroundColor(.secondary)
+                                    Text("Records will appear here after you complete a measurement.")
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                        .multilineTextAlignment(.center)
+                                        .padding(.horizontal)
 
-                            Button("Load Demo Data") {
-                                seedSampleDataIfNeeded()
+                                    Button("Load Demo Data") {
+                                        seedSampleDataIfNeeded()
+                                    }
+                                    .buttonStyle(.borderedProminent)
+                                    .tint(.red)
+                                    .padding(.top, 8)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .frame(minHeight: proxy.size.height, alignment: .center)
+                                .padding()
                             }
-                            .buttonStyle(.borderedProminent)
-                            .tint(.red)
-                            .padding(.top, 8)
+                            .scrollBounceBehavior(.always)
                         }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                        .padding()
                     } else {
                         List {
                         Section {
@@ -554,7 +560,7 @@ private extension HistoryView {
     }
 
     func heartRateBackgroundColor(for bpm: Int) -> Color {
-        heartRateBandColor(for: bpm).opacity(0.14)
+        Color(.secondarySystemGroupedBackground)
     }
 
     var measurementsHeaderTitle: String {
