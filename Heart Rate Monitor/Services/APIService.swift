@@ -304,7 +304,7 @@ final class APIService {
         isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let isoDate = isoFormatter.string(from: recordedAt)
         var body: [String: Any] = ["bpm": bpm, "recorded_at": isoDate]
-        if let id { body["id"] = id }
+        if let id { body["id"] = id.lowercased() }
         if let stressLevel { body["stress_level"] = stressLevel }
         return try await request(.post, path: "/heart-rate", body: body, authenticated: true)
     }
@@ -321,11 +321,12 @@ final class APIService {
     }
 
     func deleteHeartRateEntry(id: String) async throws {
-        try await requestNoContent(.delete, path: "/heart-rate/\(id)", authenticated: true)
+        try await requestNoContent(.delete, path: "/heart-rate/\(id.lowercased())", authenticated: true)
     }
 
     func deleteHeartRateEntries(ids: [String]) async throws {
-        let body: [String: Any] = ["ids": ids]
+        let normalizedIDs = ids.map { $0.lowercased() }
+        let body: [String: Any] = ["ids": normalizedIDs]
         // batch-delete returns {"deleted": N}, not 204
         let _: [String: Int] = try await request(
             .post, path: "/heart-rate/batch-delete", body: body, authenticated: true

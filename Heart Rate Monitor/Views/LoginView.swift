@@ -10,6 +10,12 @@ struct LoginView: View {
     @State private var errorText: String?
     var inPopup: Bool = false
 
+    private var isLoginDisabled: Bool {
+        isLoading ||
+        email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        password.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Welcome Back")
@@ -99,7 +105,7 @@ struct LoginView: View {
                                 in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                     .foregroundColor(.white)
                 }
-                .disabled(isLoading)
+                .disabled(isLoginDisabled)
                 .buttonStyle(.plain)
                 .padding(.top, 8)
             }
