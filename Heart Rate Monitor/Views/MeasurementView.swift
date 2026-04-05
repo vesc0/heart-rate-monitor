@@ -84,6 +84,7 @@ struct MeasurementView: View {
                 .frame(maxHeight: .infinity)
             }
             .navigationTitle("Measure")
+            .navigationBarTitleDisplayMode(.large)
             .onChange(of: category) { _, newCategory in
                 switch newCategory {
                 case .heartRate:
@@ -101,6 +102,7 @@ struct MeasurementView: View {
                 stopAllMeasurementsIfNeeded()
             }
         }
+        .appTopGradientNavigationBar()
     }
 
     private func applyPageIndicatorColors() {

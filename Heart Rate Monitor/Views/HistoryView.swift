@@ -438,6 +438,7 @@ struct HistoryView: View {
                 }
             }
             .navigationTitle("Stats")
+            .navigationBarTitleDisplayMode(.large)
         }
         .onChange(of: vm.log) { _, _ in
             updateVisibleCountForFilter()

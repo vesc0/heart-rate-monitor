@@ -45,8 +45,8 @@ struct SettingsView: View {
                         set: { vm.setAppleHealthSyncEnabled($0) }
                     )) {
                         VStack(alignment: .leading, spacing: 3) {
-                            Text("Save New Measurements To Apple Health")
-                            Text("When enabled, each new BPM result is written to Health.")
+                            Text("Save New Measurements")
+                            Text("When enabled, each new BPM result is written to Apple Health.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -93,6 +93,7 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
+            .navigationBarTitleDisplayMode(.large)
             .alert("Export History?", isPresented: $showExportConfirmAlert) {
                 Button("No", role: .cancel) {}
                 Button("Yes") {

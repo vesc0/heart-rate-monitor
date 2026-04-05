@@ -71,6 +71,7 @@ struct ProfileView: View {
                 }
             }
             .navigationTitle("Profile")
+            .navigationBarTitleDisplayMode(.large)
         }
     }
 
@@ -132,10 +133,6 @@ struct ProfileView: View {
                     .padding(.horizontal, 6)
 
                 VStack(spacing: 0) {
-                    profileRow(icon: "person.fill", label: "Name", value: auth.username ?? "", editable: .name)
-                    Divider().padding(.leading, 48)
-                    profileRow(icon: "envelope.fill", label: "Email", value: auth.currentEmail ?? "", editable: .email)
-                    Divider().padding(.leading, 48)
                     profileRow(icon: "calendar", label: "Age", value: auth.age ?? "", editable: .age)
                     Divider().padding(.leading, 48)
                     profileRow(icon: "figure.stand", label: "Gender", value: (auth.gender ?? "").capitalized, editable: .gender)
@@ -172,7 +169,7 @@ struct ProfileView: View {
                     Text("Sign Out")
                         .fontWeight(.semibold)
                 }
-                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 18)
                 .padding(.vertical, 14)
                 .foregroundStyle(Color.red.opacity(0.9))
                 .background(
@@ -185,6 +182,7 @@ struct ProfileView: View {
                 )
             }
             .buttonStyle(.plain)
+            .frame(maxWidth: .infinity, alignment: .center)
             .padding(.top, 8)
             .padding(.bottom, 32)
         }
@@ -196,43 +194,28 @@ struct ProfileView: View {
     // MARK: - Header Card
 
     private var profileHeaderCard: some View {
-        VStack(spacing: 14) {
-            ZStack {
-                Circle()
-                    .strokeBorder(
-                        AngularGradient(
-                            gradient: Gradient(colors: [.pink, .red, .orange, .pink]),
-                            center: .center
-                        ),
-                        lineWidth: 3
-                    )
-                    .frame(width: 94, height: 94)
-                    .opacity(0.6)
+        HStack(alignment: .center, spacing: 14) {
+            profileAvatar
 
-                Circle()
-                    .fill(Color(.tertiarySystemGroupedBackground))
-                    .frame(width: 86, height: 86)
-                    .overlay(
-                        Image(systemName: "person.crop.circle.fill")
-                            .resizable()
-                            .scaledToFit()
-                            .foregroundStyle(.secondary)
-                            .padding(12)
-                    )
+            VStack(spacing: 0) {
+                profileRow(
+                    icon: "person.fill",
+                    label: "Name",
+                    value: auth.username ?? "",
+                    editable: .name,
+                    placeholder: "Your Name"
+                )
+                Divider().padding(.leading, 48)
+                profileRow(
+                    icon: "envelope.fill",
+                    label: "Email",
+                    value: auth.currentEmail ?? "",
+                    editable: .email
+                )
             }
-            .padding(.top, 12)
-
-            VStack(spacing: 4) {
-                Text((auth.username ?? "").isEmpty ? "Your Name" : auth.username!)
-                    .font(.title3).fontWeight(.bold)
-                Text(auth.currentEmail ?? "")
-                    .foregroundStyle(.secondary)
-                    .font(.subheadline)
-            }
-            .multilineTextAlignment(.center)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
         .background(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .fill(Color(.secondarySystemGroupedBackground))
@@ -243,10 +226,36 @@ struct ProfileView: View {
         )
     }
 
+    private var profileAvatar: some View {
+        ZStack {
+            Circle()
+                .strokeBorder(
+                    AngularGradient(
+                        gradient: Gradient(colors: [.pink, .red, .orange, .pink]),
+                        center: .center
+                    ),
+                    lineWidth: 3
+                )
+                .frame(width: 94, height: 94)
+                .opacity(0.6)
+
+            Circle()
+                .fill(Color(.tertiarySystemGroupedBackground))
+                .frame(width: 86, height: 86)
+                .overlay(
+                    Image(systemName: "person.crop.circle.fill")
+                        .resizable()
+                        .scaledToFit()
+                        .foregroundStyle(.secondary)
+                        .padding(12)
+                )
+        }
+    }
+
     // MARK: - Profile Row
 
     @ViewBuilder
-    func profileRow(icon: String, label: String, value: String, editable: EditableField) -> some View {
+    func profileRow(icon: String, label: String, value: String, editable: EditableField, placeholder: String = "Not set") -> some View {
         Button {
             editingField = editable
         } label: {
@@ -264,17 +273,13 @@ struct ProfileView: View {
                     Text(label)
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Text(value.isEmpty ? "Not set" : value)
+                    Text(value.isEmpty ? placeholder : value)
                         .font(.body)
                         .foregroundColor(value.isEmpty ? .secondary : .primary)
                         .lineLimit(1)
                 }
 
                 Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.tertiary)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
