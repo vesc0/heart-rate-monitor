@@ -238,7 +238,8 @@ struct HistoryView: View {
                                 .frame(minHeight: proxy.size.height, alignment: .center)
                                 .padding()
                             }
-                            .scrollBounceBehavior(.always)
+                            .scrollBounceBehavior(.basedOnSize)
+                            .scrollIndicators(.hidden)
                         }
                     } else {
                         List {

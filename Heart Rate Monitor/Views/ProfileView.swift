@@ -43,6 +43,7 @@ struct ProfileView: View {
                     }
                     .scrollDismissesKeyboard(.interactively)
                     .scrollBounceBehavior(.always)
+                    .scrollIndicators(.hidden)
                 }
             }
             .id(auth.isSignedIn)
