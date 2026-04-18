@@ -92,12 +92,6 @@ class HeartRateViewModel: ObservableObject {
         let finalBPM = computeAverageBPM(from: validIntervals)
         currentBPM = finalBPM
 
-        // Only save if BPM is valid
-        if let bpm = finalBPM {
-            let entry = HeartRateEntry(bpm: bpm, date: Date())
-            addEntry(entry)
-        }
-
         phase = .finished
         invalidateAllTimers()
     }
@@ -291,7 +285,8 @@ class HeartRateViewModel: ObservableObject {
                         bpm: $0.bpm,
                         date: $0.recordedAt,
                         id: UUID(uuidString: $0.id) ?? UUID(),
-                        stressLevel: $0.stressLevel
+                        stressLevel: $0.stressLevel,
+                        activityState: $0.activityState
                     )
                 }
                 self.saveLocal()
@@ -327,7 +322,8 @@ class HeartRateViewModel: ObservableObject {
                     id: entry.id.uuidString,
                     bpm: entry.bpm,
                     recordedAt: entry.date,
-                    stressLevel: entry.stressLevel
+                    stressLevel: entry.stressLevel,
+                    activityState: entry.activityState
                 )
             } catch {
                 // syncCreate failed; logged for debugging before, left silent now

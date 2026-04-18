@@ -35,10 +35,10 @@ enum APIError: LocalizedError {
 
 // MARK: - Response types
 
-struct AuthTokenResponse: Codable {
+struct AuthTokenResponse: Decodable {
     let accessToken: String
     let tokenType: String
-    let username: String?
+    let name: String?
     let email: String?
     let age: Int?
     let gender: String?
@@ -49,20 +49,35 @@ struct AuthTokenResponse: Codable {
     enum CodingKeys: String, CodingKey {
         case accessToken = "access_token"
         case tokenType   = "token_type"
-        case username, email, age, gender
+        case name, username, email, age, gender
         case heightCm = "height_cm"
         case weightKg = "weight_kg"
         case healthIssues = "health_issues"
     }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        accessToken = try container.decode(String.self, forKey: .accessToken)
+        tokenType = try container.decode(String.self, forKey: .tokenType)
+        name = try container.decodeIfPresent(String.self, forKey: .name)
+            ?? container.decodeIfPresent(String.self, forKey: .username)
+        email = try container.decodeIfPresent(String.self, forKey: .email)
+        age = try container.decodeIfPresent(Int.self, forKey: .age)
+        gender = try container.decodeIfPresent(String.self, forKey: .gender)
+        heightCm = try container.decodeIfPresent(Int.self, forKey: .heightCm)
+        weightKg = try container.decodeIfPresent(Int.self, forKey: .weightKg)
+        healthIssues = try container.decodeIfPresent(String.self, forKey: .healthIssues)
+    }
 }
 
-struct RegisterResponse: Codable {
+struct RegisterResponse: Decodable {
     let message: String
-    let username: String
+    let email: String?
+    let name: String?
 }
 
-struct UserProfileResponse: Codable {
-    let username: String
+struct UserProfileResponse: Decodable {
+    let name: String?
     let email: String
     let age: Int?
     let gender: String?
@@ -71,10 +86,22 @@ struct UserProfileResponse: Codable {
     let healthIssues: String?
 
     enum CodingKeys: String, CodingKey {
-        case username, email, age, gender
+        case name, username, email, age, gender
         case heightCm = "height_cm"
         case weightKg = "weight_kg"
         case healthIssues = "health_issues"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        name = try container.decodeIfPresent(String.self, forKey: .name)
+            ?? container.decodeIfPresent(String.self, forKey: .username)
+        email = try container.decode(String.self, forKey: .email)
+        age = try container.decodeIfPresent(Int.self, forKey: .age)
+        gender = try container.decodeIfPresent(String.self, forKey: .gender)
+        heightCm = try container.decodeIfPresent(Int.self, forKey: .heightCm)
+        weightKg = try container.decodeIfPresent(Int.self, forKey: .weightKg)
+        healthIssues = try container.decodeIfPresent(String.self, forKey: .healthIssues)
     }
 }
 
@@ -84,12 +111,14 @@ struct HeartRateEntryResponse: Codable, Identifiable {
     let recordedAt: Date
     let createdAt: Date
     let stressLevel: String?
+    let activityState: MeasurementState?
 
     enum CodingKeys: String, CodingKey {
         case id, bpm
         case recordedAt = "recorded_at"
         case createdAt  = "created_at"
         case stressLevel = "stress_level"
+        case activityState = "activity_state"
     }
 }
 
@@ -272,7 +301,7 @@ final class APIService {
     }
 
     func updateProfile(
-        username: String? = nil,
+        name: String? = nil,
         email: String? = nil,
         age: Int? = nil,
         gender: String? = nil,
@@ -281,7 +310,7 @@ final class APIService {
         healthIssues: String? = nil
     ) async throws -> UserProfileResponse {
         var body: [String: Any] = [:]
-        if let username { body["username"] = username }
+        if let name { body["name"] = name }
         if let email { body["email"] = email }
         if let age { body["age"] = age }
         if let gender { body["gender"] = gender }
@@ -298,7 +327,8 @@ final class APIService {
         id: String? = nil,
         bpm: Int,
         recordedAt: Date,
-        stressLevel: String? = nil
+        stressLevel: String? = nil,
+        activityState: MeasurementState? = nil
     ) async throws -> HeartRateEntryResponse {
         let isoFormatter = ISO8601DateFormatter()
         isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -306,6 +336,7 @@ final class APIService {
         var body: [String: Any] = ["bpm": bpm, "recorded_at": isoDate]
         if let id { body["id"] = id.lowercased() }
         if let stressLevel { body["stress_level"] = stressLevel }
+        if let activityState { body["activity_state"] = activityState.rawValue }
         return try await request(.post, path: "/heart-rate", body: body, authenticated: true)
     }
 

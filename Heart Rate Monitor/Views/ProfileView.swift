@@ -202,7 +202,7 @@ struct ProfileView: View {
                 profileRow(
                     icon: "person.fill",
                     label: "Name",
-                    value: auth.username ?? "",
+                    value: auth.name ?? "",
                     editable: .name,
                     placeholder: "Your Name"
                 )
@@ -317,7 +317,7 @@ struct ProfileView: View {
 
     private func currentValue(for field: EditableField) -> String {
         switch field {
-        case .name:   return auth.username ?? ""
+        case .name:   return auth.name ?? ""
         case .email:  return auth.currentEmail ?? ""
         case .age:    return auth.age ?? ""
         case .gender: return auth.gender ?? ""
@@ -333,7 +333,7 @@ struct ProfileView: View {
             do {
                 switch field {
                 case .name:
-                    try await auth.updateProfile(username: newValue)
+                    try await auth.updateProfile(name: newValue)
                 case .email:
                     try await auth.updateProfile(email: newValue)
                 case .age:

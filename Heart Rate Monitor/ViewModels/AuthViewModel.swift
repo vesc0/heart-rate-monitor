@@ -8,7 +8,7 @@ final class AuthViewModel: ObservableObject {
 
     @Published var isSignedIn: Bool
     @Published var currentEmail: String?
-    @Published var username: String?
+    @Published var name: String?
     @Published var age: String?
     @Published var gender: String?
     @Published var heightCm: String?
@@ -20,7 +20,7 @@ final class AuthViewModel: ObservableObject {
     private let api = APIService.shared
 
     private let emailKey        = "auth.email"
-    private let usernameKey     = "auth.username"
+    private let nameKey         = "auth.name"
     private let ageKey          = "auth.age"
     private let genderKey       = "auth.gender"
     private let heightCmKey     = "auth.heightCm"
@@ -37,7 +37,7 @@ final class AuthViewModel: ObservableObject {
 
         if hasToken {
             self.currentEmail  = UserDefaults.standard.string(forKey: emailKey)
-            self.username      = UserDefaults.standard.string(forKey: usernameKey)
+            self.name          = UserDefaults.standard.string(forKey: nameKey)
             self.age           = UserDefaults.standard.string(forKey: ageKey)
             self.gender        = UserDefaults.standard.string(forKey: genderKey)
             self.heightCm      = UserDefaults.standard.string(forKey: heightCmKey)
@@ -45,7 +45,7 @@ final class AuthViewModel: ObservableObject {
             self.healthIssues  = UserDefaults.standard.string(forKey: healthIssuesKey)
         } else {
             self.currentEmail = nil
-            self.username     = nil
+            self.name         = nil
             self.age          = nil
             self.gender       = nil
             self.heightCm     = nil
@@ -73,7 +73,7 @@ final class AuthViewModel: ObservableObject {
 
     func signUp(email: String, password: String) async throws {
         guard validateEmail(email) else { throw AuthError.invalidEmail }
-        guard password.count >= 6   else { throw AuthError.weakPassword }
+        guard validatePassword(password) else { throw AuthError.weakPassword }
 
         do {
             try await api.register(email: email, password: password)
@@ -105,7 +105,7 @@ final class AuthViewModel: ObservableObject {
         api.logout()
         isSignedIn   = false
         currentEmail = nil
-        username     = nil
+        name         = nil
         age          = nil
         gender       = nil
         heightCm     = nil
@@ -121,7 +121,7 @@ final class AuthViewModel: ObservableObject {
         guard api.isAuthenticated else { return }
         do {
             let profile = try await api.fetchProfile()
-            username     = profile.username
+            name         = profile.name
             currentEmail = profile.email
             age          = profile.age.map { String($0) }
             gender       = profile.gender
@@ -135,7 +135,7 @@ final class AuthViewModel: ObservableObject {
     }
 
     func updateProfile(
-        username: String? = nil,
+        name: String? = nil,
         email: String? = nil,
         age: Int? = nil,
         gender: String? = nil,
@@ -146,7 +146,7 @@ final class AuthViewModel: ObservableObject {
         guard api.isAuthenticated else { return }
         do {
             let updated = try await api.updateProfile(
-                username: username,
+                name: name,
                 email: email,
                 age: age,
                 gender: gender,
@@ -154,7 +154,7 @@ final class AuthViewModel: ObservableObject {
                 weightKg: weightKg,
                 healthIssues: healthIssues
             )
-            self.username     = updated.username
+            self.name         = updated.name
             self.currentEmail = updated.email
             self.age          = updated.age.map { String($0) }
             self.gender       = updated.gender
@@ -171,7 +171,7 @@ final class AuthViewModel: ObservableObject {
 
     private func applyLoginResponse(_ response: AuthTokenResponse, fallbackEmail: String) {
         currentEmail = response.email ?? fallbackEmail
-        username     = response.username
+        name         = response.name
         age          = response.age.map { String($0) }
         gender       = response.gender
         heightCm     = response.heightCm.map { String($0) }
@@ -184,7 +184,7 @@ final class AuthViewModel: ObservableObject {
     private func persistProfile() {
         let ud = UserDefaults.standard
         ud.set(currentEmail, forKey: emailKey)
-        ud.set(username,     forKey: usernameKey)
+        ud.set(name,         forKey: nameKey)
         ud.set(age,          forKey: ageKey)
         ud.set(gender,       forKey: genderKey)
         ud.set(heightCm,     forKey: heightCmKey)
@@ -194,7 +194,7 @@ final class AuthViewModel: ObservableObject {
 
     private func clearPersistedProfile() {
         let ud = UserDefaults.standard
-        for key in [emailKey, usernameKey, ageKey, genderKey, heightCmKey, weightKgKey, healthIssuesKey] {
+        for key in [emailKey, nameKey, ageKey, genderKey, heightCmKey, weightKgKey, healthIssuesKey] {
             ud.removeObject(forKey: key)
         }
     }
@@ -208,6 +208,14 @@ final class AuthViewModel: ObservableObject {
         email.contains("@") && email.contains(".") && email.count >= 5
     }
 
+    private func validatePassword(_ password: String) -> Bool {
+        guard password.count >= 8 else { return false }
+        let hasUpper = password.rangeOfCharacter(from: .uppercaseLetters) != nil
+        let hasLower = password.rangeOfCharacter(from: .lowercaseLetters) != nil
+        let hasDigit = password.rangeOfCharacter(from: .decimalDigits) != nil
+        return hasUpper && hasLower && hasDigit
+    }
+
     // MARK: - Errors
 
     enum AuthError: LocalizedError {
@@ -219,7 +227,7 @@ final class AuthViewModel: ObservableObject {
         var errorDescription: String? {
             switch self {
             case .invalidEmail:     return "Please enter a valid email address."
-            case .weakPassword:     return "Password should be at least 6 characters."
+            case .weakPassword:     return "Password must be at least 8 characters and include uppercase, lowercase, and a number."
             case .emptyPassword:    return "Password cannot be empty."
             case .generic(let msg): return msg
             }

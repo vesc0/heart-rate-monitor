@@ -50,12 +50,12 @@ struct SignUpView: View {
                 
                 HStack {
                     if showPassword {
-                        TextField("Password (min 6 characters)", text: $password)
+                        TextField("Password (min 8, Aa1)", text: $password)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                             .foregroundColor(.primary)
                     } else {
-                        SecureField("Password (min 6 characters)", text: $password)
+                        SecureField("Password (min 8, Aa1)", text: $password)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                             .foregroundColor(.primary)

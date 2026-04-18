@@ -49,7 +49,8 @@ struct HistoryView: View {
 
                 // Include stress demo entries so Stress monthly mode has data too.
                 let stress: String? = Bool.random() ? String(format: "%d%%", Int.random(in: 18...92)) : nil
-                entries.append(HeartRateEntry(bpm: bpm, date: ts, stressLevel: stress))
+                let state = MeasurementState.allCases.randomElement()
+                entries.append(HeartRateEntry(bpm: bpm, date: ts, stressLevel: stress, activityState: state))
             }
         }
         entries.sort { $0.date > $1.date }
@@ -338,6 +339,12 @@ struct HistoryView: View {
                                                 .font(.subheadline.weight(.semibold))
                                                 .foregroundStyle(.secondary)
                                         }
+                                        if let state = entry.activityState {
+                                            Label(state.displayName, systemImage: "figure.walk")
+                                                .font(.caption2)
+                                                .fontWeight(.semibold)
+                                                .foregroundColor(activityStateColor(for: state))
+                                        }
                                         if let stress = entry.stressLevel {
                                             Text(stressDisplayText(for: stress))
                                                 .font(.caption)
@@ -544,6 +551,17 @@ private extension HistoryView {
             return "\(pct)% stressed"
         }
         return stress
+    }
+
+    func activityStateColor(for state: MeasurementState) -> Color {
+        switch state {
+        case .resting:
+            return .blue
+        case .activity:
+            return .orange
+        case .recovery:
+            return .mint
+        }
     }
 
     func heartRateBandColor(for bpm: Int) -> Color {

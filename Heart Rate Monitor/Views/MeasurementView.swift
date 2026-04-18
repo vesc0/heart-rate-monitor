@@ -150,6 +150,7 @@ private struct StressContentView: View {
     @ObservedObject var vm: HeartRateViewModel
     @EnvironmentObject private var auth: AuthViewModel
     @ObservedObject var stressVM: StressViewModel
+    @State private var selectedState: MeasurementState? = nil
     let onStart: () -> Void
 
     private var totalForCurrentPhase: Int {
@@ -240,6 +241,11 @@ private struct StressContentView: View {
                             Text("Heart Rate: \(bpm) BPM")
                                 .font(.title3)
                                 .foregroundColor(.secondary)
+
+                            MeasurementStatePromptCard(
+                                bpm: bpm,
+                                selectedState: $selectedState
+                            )
                         }
 
                         if stressVM.isPredicting {
@@ -260,15 +266,23 @@ private struct StressContentView: View {
                             Text(pct >= 70 ? "High Stress" : pct >= 40 ? "Moderate Stress" : "Low Stress")
                                 .font(.title3)
                                 .foregroundColor(color)
+                        } else if let predictionError = stressVM.errorMessage,
+                                  stressVM.currentBPM != nil {
+                            Text(predictionError)
+                                .font(.footnote)
+                                .foregroundColor(.orange)
+                                .multilineTextAlignment(.center)
                         }
 
                         Button {
-                            stressVM.phase = .idle
+                            saveFinishedStressMeasurement()
                         } label: {
-                            Label("Done", systemImage: "checkmark")
+                            Label("Save Measurement", systemImage: "checkmark")
                                 .measurementPrimaryButtonStyle()
                         }
                         .buttonStyle(.plain)
+                        .disabled(selectedState == nil || stressVM.currentBPM == nil || stressVM.isPredicting)
+                        .opacity((selectedState == nil || stressVM.currentBPM == nil || stressVM.isPredicting) ? 0.55 : 1)
                         .padding(.horizontal, 64)
                     }
                     .frame(maxHeight: .infinity, alignment: .center)
@@ -291,30 +305,8 @@ private struct StressContentView: View {
             }
         }
         .onChange(of: stressVM.phase) { _, newPhase in
-            if newPhase == .finished, let bpm = stressVM.currentBPM {
-                let stress = stressVM.stressResult.map { String(format: "%.0f%%", $0.stressLevelPct) }
-                let entry = HeartRateEntry(bpm: bpm, date: Date(), stressLevel: stress)
-                vm.addEntry(entry)
-            }
-        }
-        .onChange(of: stressVM.stressResult?.stressLevelPct) { oldVal, newVal in
-            if let pct = newVal,
-               oldVal == nil,
-               stressVM.phase == .finished,
-               let bpm = stressVM.currentBPM {
-                let level = String(format: "%.0f%%", pct)
-                if let idx = vm.log.firstIndex(where: {
-                    $0.bpm == bpm && $0.stressLevel == nil
-                }) {
-                    let old = vm.log[idx]
-                    let updated = HeartRateEntry(
-                        bpm: old.bpm,
-                        date: old.date,
-                        id: old.id,
-                        stressLevel: level
-                    )
-                    vm.updateEntry(updated)
-                }
+            if newPhase != .finished {
+                selectedState = nil
             }
         }
         .alert("Flash Unavailable", isPresented: .constant(stressVM.flashUnavailableAlert != nil)) {
@@ -328,12 +320,27 @@ private struct StressContentView: View {
             }
         }
     }
+
+    private func saveFinishedStressMeasurement() {
+        guard let bpm = stressVM.currentBPM, let state = selectedState else { return }
+        let stress = stressVM.stressResult.map { String(format: "%.0f%%", $0.stressLevelPct) }
+        let entry = HeartRateEntry(
+            bpm: bpm,
+            date: Date(),
+            stressLevel: stress,
+            activityState: state
+        )
+        vm.addEntry(entry)
+        selectedState = nil
+        stressVM.phase = .idle
+    }
 }
 
 // MARK: - Tap Measurement Content
 
 private struct TapContentView: View {
     @ObservedObject var vm: HeartRateViewModel
+    @State private var selectedState: MeasurementState? = nil
     let onStart: () -> Void
 
     private var totalForCurrentPhase: Int {
@@ -420,21 +427,33 @@ private struct TapContentView: View {
                         Text("\(bpm) BPM")
                             .font(.system(size: 42, weight: .bold))
 
-                        Text("Measurement complete")
-                            .foregroundColor(.secondary)
+                        MeasurementStatePromptCard(
+                            bpm: bpm,
+                            selectedState: $selectedState
+                        )
+
+                        Button {
+                            saveFinishedTapMeasurement(bpm: bpm)
+                        } label: {
+                            Label("Save Measurement", systemImage: "checkmark")
+                                .measurementPrimaryButtonStyle()
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(selectedState == nil)
+                        .opacity(selectedState == nil ? 0.55 : 1)
+                        .padding(.horizontal, 64)
                     } else {
                         Text("No data recorded")
                             .foregroundColor(.secondary)
+                        Button {
+                            vm.startNewSession()
+                        } label: {
+                            Label("Try Again", systemImage: "arrow.counterclockwise")
+                                .measurementPrimaryButtonStyle()
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, 64)
                     }
-
-                    Button {
-                        vm.startNewSession()
-                    } label: {
-                        Label("New Measurement", systemImage: "arrow.counterclockwise")
-                            .measurementPrimaryButtonStyle()
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, 64)
                 }
                 .frame(maxHeight: .infinity, alignment: .center)
             }
@@ -442,6 +461,19 @@ private struct TapContentView: View {
             Spacer()
         }
         .padding()
+        .onChange(of: vm.phase) { _, newPhase in
+            if newPhase != .finished {
+                selectedState = nil
+            }
+        }
+    }
+
+    private func saveFinishedTapMeasurement(bpm: Int) {
+        guard let state = selectedState else { return }
+        let entry = HeartRateEntry(bpm: bpm, date: Date(), activityState: state)
+        vm.addEntry(entry)
+        selectedState = nil
+        vm.startNewSession()
     }
 }
 
@@ -450,6 +482,7 @@ private struct TapContentView: View {
 private struct CameraContentView: View {
     @ObservedObject var vm: HeartRateViewModel
     @ObservedObject var autoVM: AutoHeartRateViewModel
+    @State private var selectedState: MeasurementState? = nil
     let onStart: () -> Void
 
     private var totalForCurrentPhase: Int {
@@ -541,21 +574,33 @@ private struct CameraContentView: View {
                             Text("\(bpm) BPM")
                                 .font(.system(size: 42, weight: .bold))
 
-                            Text("Measurement complete")
-                                .foregroundColor(.secondary)
+                            MeasurementStatePromptCard(
+                                bpm: bpm,
+                                selectedState: $selectedState
+                            )
+
+                            Button {
+                                saveFinishedCameraMeasurement(bpm: bpm)
+                            } label: {
+                                Label("Save Measurement", systemImage: "checkmark")
+                                    .measurementPrimaryButtonStyle()
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(selectedState == nil)
+                            .opacity(selectedState == nil ? 0.55 : 1)
+                            .padding(.horizontal, 64)
                         } else {
                             Text("No result")
                                 .foregroundColor(.secondary)
+                            Button {
+                                autoVM.phase = .idle
+                            } label: {
+                                Label("Try Again", systemImage: "arrow.counterclockwise")
+                                    .measurementPrimaryButtonStyle()
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.horizontal, 64)
                         }
-
-                        Button {
-                            autoVM.phase = .idle
-                        } label: {
-                            Label("New Measurement", systemImage: "arrow.counterclockwise")
-                                .measurementPrimaryButtonStyle()
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.horizontal, 64)
                     }
                     .frame(maxHeight: .infinity, alignment: .center)
                 }
@@ -577,11 +622,9 @@ private struct CameraContentView: View {
                 .padding(.bottom, 44)
             }
         }
-        // When session ends, save to shared history
         .onChange(of: autoVM.phase) { _, newPhase in
-            if newPhase == .finished, let bpm = autoVM.currentBPM {
-                let entry = HeartRateEntry(bpm: bpm, date: Date())
-                vm.addEntry(entry)
+            if newPhase != .finished {
+                selectedState = nil
             }
         }
         .alert("Flash Unavailable", isPresented: .constant(autoVM.flashUnavailableAlert != nil)) {
@@ -594,6 +637,78 @@ private struct CameraContentView: View {
                 Text(alert)
             }
         }
+    }
+
+    private func saveFinishedCameraMeasurement(bpm: Int) {
+        guard let state = selectedState else { return }
+        let entry = HeartRateEntry(bpm: bpm, date: Date(), activityState: state)
+        vm.addEntry(entry)
+        selectedState = nil
+        autoVM.phase = .idle
+    }
+}
+
+private struct MeasurementStatePromptCard: View {
+    let bpm: Int
+    @Binding var selectedState: MeasurementState?
+
+    private var assessment: HeartRateRangeAssessment? {
+        guard let selectedState else { return nil }
+        return selectedState.assessment(for: bpm)
+    }
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Text("What is your current state?")
+                .font(.subheadline.weight(.semibold))
+
+            Picker("Measurement state", selection: $selectedState) {
+                Text("Select state").tag(Optional<MeasurementState>.none)
+                ForEach(MeasurementState.allCases) { state in
+                    Text(state.displayName).tag(Optional(state))
+                }
+            }
+            .pickerStyle(.menu)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color(.secondarySystemGroupedBackground))
+            )
+
+            if let assessment {
+                VStack(spacing: 4) {
+                    Label(
+                        assessment.title,
+                        systemImage: assessment.isNormal ? "checkmark.seal.fill" : "exclamationmark.triangle.fill"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(assessment.isNormal ? .green : .orange)
+
+                    Text(assessment.detail)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+            } else {
+                Text("Choose a state to check whether your BPM is in a normal range.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 14)
+        .frame(maxWidth: 420)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color(.tertiarySystemGroupedBackground))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+        )
     }
 }
 
