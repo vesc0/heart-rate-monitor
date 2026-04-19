@@ -7,6 +7,8 @@ struct HeartTimerView: View {
     // Bigger default size
     var heartSize: CGFloat = 160
     let color: Color
+    var showHeart: Bool = true
+    var heartIconScale: CGFloat = 1.0
     
     // Bigger gap and thicker ring for balance
     private let ringInset: CGFloat = 72   // was 48
@@ -32,13 +34,14 @@ struct HeartTimerView: View {
                 .frame(width: heartSize + ringInset, height: heartSize + ringInset)
                 .animation(.easeInOut(duration: 0.25), value: progress)
             
-            // Heart
-            Image(systemName: "heart.fill")
-                .resizable()
-                .scaledToFit()
-                .frame(width: heartSize, height: heartSize)
-                .foregroundColor(.red)
-                .scaleEffect(heartScale)
+            if showHeart {
+                Image(systemName: "heart.fill")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: heartSize * heartIconScale, height: heartSize * heartIconScale)
+                    .foregroundColor(.red)
+                    .scaleEffect(heartScale)
+            }
         }
     }
 }

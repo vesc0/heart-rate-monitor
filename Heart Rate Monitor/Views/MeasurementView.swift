@@ -162,22 +162,6 @@ private struct StressContentView: View {
 
     var body: some View {
         ZStack {
-            if stressVM.phase == .measuring {
-                VStack(spacing: 0) {
-                    CameraPreview(session: stressVM.session)
-                        .frame(height: 160)
-                        .overlay(
-                            LinearGradient(
-                                gradient: Gradient(colors: [.black.opacity(0.5), .clear]),
-                                startPoint: .top, endPoint: .bottom
-                            )
-                        )
-                        .clipped()
-                    Spacer()
-                }
-                .ignoresSafeArea(edges: .top)
-            }
-
             VStack(spacing: 16) {
                 if stressVM.phase == .idle {
                     VStack(spacing: 16) {
@@ -216,13 +200,21 @@ private struct StressContentView: View {
                     VStack(spacing: 16) {
                         Spacer()
 
-                        HeartTimerView(
-                            heartScale: stressVM.heartScale,
-                            secondsLeft: stressVM.secondsLeft,
-                            totalSeconds: totalForCurrentPhase,
-                            heartSize: 96,
-                            color: .purple
-                        )
+                        ZStack {
+                            CameraPreview(session: stressVM.session)
+                                .frame(width: 180, height: 180)
+                                .clipShape(Circle())
+
+                            HeartTimerView(
+                                heartScale: stressVM.heartScale,
+                                secondsLeft: stressVM.secondsLeft,
+                                totalSeconds: totalForCurrentPhase,
+                                heartSize: 126,
+                                color: .purple,
+                                showHeart: stressVM.secondsLeft > 0,
+                                heartIconScale: 0.78
+                            )
+                        }
 
                         if stressVM.canShowBPM, let bpm = stressVM.currentBPM {
                             Text("\(bpm) BPM")
@@ -390,8 +382,9 @@ private struct TapContentView: View {
                         heartScale: vm.heartScale,
                         secondsLeft: vm.secondsLeft,
                         totalSeconds: totalForCurrentPhase,
-                        heartSize: 96,
-                        color: .red
+                        heartSize: 126,
+                        color: .red,
+                        heartIconScale: 0.78
                     )
                     .contentShape(Rectangle())
                     .onTapGesture {
@@ -494,23 +487,6 @@ private struct CameraContentView: View {
 
     var body: some View {
         ZStack {
-            // Camera preview only during measuring
-            if autoVM.phase == .measuring {
-                VStack(spacing: 0) {
-                    CameraPreview(session: autoVM.session)
-                        .frame(height: 160)
-                        .overlay(
-                            LinearGradient(
-                                gradient: Gradient(colors: [.black.opacity(0.5), .clear]),
-                                startPoint: .top, endPoint: .bottom
-                            )
-                        )
-                        .clipped()
-                    Spacer()
-                }
-                .ignoresSafeArea(edges: .top)
-            }
-
             VStack(spacing: 16) {
                 if autoVM.phase == .idle {
                     VStack(spacing: 16) {
@@ -545,13 +521,21 @@ private struct CameraContentView: View {
                     VStack(spacing: 16) {
                         Spacer()
 
-                        HeartTimerView(
-                            heartScale: autoVM.heartScale,
-                            secondsLeft: autoVM.secondsLeft,
-                            totalSeconds: totalForCurrentPhase,
-                            heartSize: 96,
-                            color: .red
-                        )
+                        ZStack {
+                            CameraPreview(session: autoVM.session)
+                                .frame(width: 180, height: 180)
+                                .clipShape(Circle())
+
+                            HeartTimerView(
+                                heartScale: autoVM.heartScale,
+                                secondsLeft: autoVM.secondsLeft,
+                                totalSeconds: totalForCurrentPhase,
+                                heartSize: 126,
+                                color: .red,
+                                showHeart: autoVM.secondsLeft > 0,
+                                heartIconScale: 0.78
+                            )
+                        }
 
                         if autoVM.canShowBPM, let bpm = autoVM.currentBPM {
                             Text("\(bpm) BPM")
